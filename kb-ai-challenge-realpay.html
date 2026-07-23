@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KB AI Challenge 기획안 &amp; MVP 정의 · RealPay</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#17171A;
+  --ink-soft:#55575E;
+  --ink-faint:#8A8D95;
+  --paper:#EDEEF0;
+  --card:#FFFFFF;
+  --line:#D9DBDE;
+  --line-soft:#E8E9EB;
+  --kb:#FFBC00;
+  --kb-ink:#5A4200;
+  --graphite:#1F2126;
+  --teal:#0F6B60;
+  --rust:#A8382A;
+  --mono:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans:"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", system-ui, sans-serif;
+}
+
+*{box-sizing:border-box;}
+html{-webkit-text-size-adjust:100%;}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:16px;
+  line-height:1.72;
+  letter-spacing:-0.011em;
+  word-break:keep-all;
+}
+a{color:inherit;}
+
+.wrap{max-width:940px;margin:0 auto;padding:0 24px 120px;}
+
+/* ---------- hero ---------- */
+.hero{padding:72px 0 40px;}
+.tagstrip{
+  font-family:var(--mono);
+  font-size:11.5px;
+  letter-spacing:0.14em;
+  text-transform:uppercase;
+  color:var(--ink-faint);
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px 18px;
+  align-items:center;
+  border-bottom:1px solid var(--line);
+  padding-bottom:14px;
+}
+.tagstrip .dday{
+  background:var(--kb);
+  color:var(--kb-ink);
+  padding:2px 9px;
+  border-radius:2px;
+  font-weight:600;
+  letter-spacing:0.08em;
+}
+.hero h1{
+  font-size:clamp(30px,5.2vw,50px);
+  line-height:1.18;
+  letter-spacing:-0.04em;
+  font-weight:800;
+  margin:34px 0 0;
+}
+.hero .brand{
+  display:block;
+  font-family:var(--mono);
+  font-weight:600;
+  font-size:clamp(13px,1.8vw,15px);
+  letter-spacing:0.34em;
+  color:var(--ink-faint);
+  margin-bottom:16px;
+}
+.thesis{
+  margin:36px 0 0;
+  padding:28px 30px;
+  background:var(--graphite);
+  color:#F3F3F1;
+  border-radius:3px;
+  font-size:clamp(18px,2.6vw,24px);
+  line-height:1.62;
+  font-weight:600;
+  letter-spacing:-0.03em;
+}
+.thesis .eyebrow{
+  display:block;
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:0.2em;
+  color:var(--kb);
+  font-weight:500;
+  margin-bottom:14px;
+}
+.thesis em{font-style:normal;color:var(--kb);}
+
+/* ---------- toc ---------- */
+.toc{
+  margin:44px 0 0;
+  border-top:1px solid var(--line);
+  border-bottom:1px solid var(--line);
+  padding:18px 0;
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
+  gap:6px 24px;
+}
+.toc a{
+  text-decoration:none;
+  font-size:13.5px;
+  color:var(--ink-soft);
+  display:flex;
+  gap:10px;
+  padding:3px 0;
+  border-bottom:1px solid transparent;
+}
+.toc a:hover{color:var(--ink);border-bottom-color:var(--kb);}
+.toc .n{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);padding-top:2px;}
+
+/* ---------- sections ---------- */
+.sec{margin-top:76px;scroll-margin-top:24px;}
+.sec-head{display:flex;gap:16px;align-items:baseline;border-bottom:2px solid var(--ink);padding-bottom:10px;}
+.sec-head .n{
+  font-family:var(--mono);
+  font-size:12px;
+  font-weight:600;
+  letter-spacing:0.1em;
+  color:var(--ink-faint);
+}
+.sec-head h2{
+  margin:0;
+  font-size:clamp(21px,3vw,27px);
+  font-weight:800;
+  letter-spacing:-0.035em;
+}
+.sec-head .sub{
+  margin-left:auto;
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:0.08em;
+  color:var(--ink-faint);
+  text-align:right;
+}
+.sec > p{margin:20px 0;}
+
+h3.q{
+  margin:36px 0 14px;
+  font-size:17.5px;
+  font-weight:700;
+  letter-spacing:-0.03em;
+  line-height:1.5;
+}
+h3.q .marker{
+  font-family:var(--mono);
+  color:var(--kb-ink);
+  background:var(--kb);
+  border-radius:2px;
+  padding:1px 7px;
+  margin-right:10px;
+  font-size:13px;
+  font-weight:600;
+}
+h4.sh{
+  margin:32px 0 12px;
+  font-size:14px;
+  font-weight:700;
+  letter-spacing:0.02em;
+  display:flex;
+  align-items:center;
+  gap:9px;
+}
+h4.sh .dot{width:9px;height:9px;border-radius:50%;background:var(--kb);flex:none;}
+h4.sh.neg .dot{background:var(--rust);}
+h4.sh.pos .dot{background:var(--teal);}
+
+ul.plain{margin:14px 0;padding-left:20px;}
+ul.plain li{margin:7px 0;}
+ol.steps{margin:14px 0;padding-left:0;list-style:none;counter-reset:s;}
+ol.steps li{
+  counter-increment:s;
+  position:relative;
+  padding-left:38px;
+  margin:10px 0;
+}
+ol.steps li::before{
+  content:counter(s);
+  position:absolute;left:0;top:2px;
+  width:24px;height:24px;
+  border:1px solid var(--ink);
+  border-radius:50%;
+  font-family:var(--mono);font-size:12px;
+  display:flex;align-items:center;justify-content:center;
+  line-height:1;
+}
+
+/* ---------- ledger card (problem ①) ---------- */
+.ledger{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:3px;
+  padding:6px 0;
+  margin:16px 0;
+}
+.ledger-row{
+  display:flex;
+  gap:16px;
+  align-items:baseline;
+  padding:12px 22px;
+  border-bottom:1px dashed var(--line-soft);
+}
+.ledger-row:last-child{border-bottom:none;}
+.ledger-row .code{font-family:var(--mono);font-size:12.5px;color:var(--ink-soft);flex:none;}
+.ledger-row .label{font-size:14.5px;flex:1 1 auto;min-width:120px;}
+.ledger-row .amt{font-family:var(--mono);font-size:15px;font-weight:600;white-space:nowrap;}
+.ledger-row.delta{background:#FFF8E2;}
+.ledger-row.delta .amt{color:var(--kb-ink);}
+.ledger-row.delta .label{font-weight:700;}
+.src{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);letter-spacing:0.01em;}
+
+/* ---------- tables ---------- */
+.tablewrap{overflow-x:auto;margin:18px 0;-webkit-overflow-scrolling:touch;}
+table{
+  width:100%;
+  border-collapse:collapse;
+  background:var(--card);
+  border:1px solid var(--line);
+  font-size:14.5px;
+  min-width:520px;
+}
+th,td{
+  text-align:left;
+  padding:13px 16px;
+  border-bottom:1px solid var(--line-soft);
+  vertical-align:top;
+  line-height:1.6;
+}
+thead th{
+  background:var(--graphite);
+  color:#EDEDEA;
+  font-family:var(--mono);
+  font-size:11.5px;
+  font-weight:500;
+  letter-spacing:0.1em;
+  text-transform:uppercase;
+  border-bottom:none;
+  white-space:nowrap;
+}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr:hover{background:#FAFAF8;}
+td strong{font-weight:700;}
+td.key{font-weight:600;white-space:nowrap;}
+.mono{font-family:var(--mono);font-size:13px;}
+.yes{color:var(--teal);font-weight:700;}
+.no{color:var(--rust);font-weight:700;}
+table.compare td:last-child{background:#FFFCF2;font-weight:600;}
+table.compare th:last-child{background:var(--kb);color:var(--kb-ink);}
+
+/* ---------- callouts ---------- */
+.call{
+  margin:22px 0;
+  padding:18px 22px;
+  border-left:3px solid var(--kb);
+  background:var(--card);
+  font-size:15px;
+}
+.call .t{
+  display:block;
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:0.16em;
+  color:var(--ink-faint);
+  margin-bottom:7px;
+  text-transform:uppercase;
+}
+.call.dark{background:var(--graphite);color:#EAEAE7;border-left-color:var(--kb);}
+.call.dark .t{color:var(--kb);}
+.call.warn{border-left-color:var(--rust);}
+.call strong{font-weight:700;}
+.quote-one{
+  margin:26px 0;
+  padding:24px 26px;
+  background:var(--kb);
+  color:var(--kb-ink);
+  border-radius:3px;
+  font-size:clamp(16px,2.2vw,19px);
+  font-weight:700;
+  letter-spacing:-0.03em;
+  line-height:1.6;
+}
+.quote-one .t{
+  display:block;font-family:var(--mono);font-size:11px;letter-spacing:0.18em;
+  opacity:.7;margin-bottom:9px;font-weight:500;
+}
+
+/* ---------- signature: agent loop ---------- */
+.loop{
+  position:relative;
+  margin:26px 0 10px;
+  padding:26px 22px 78px;
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:3px;
+}
+.loop-track{
+  display:grid;
+  grid-template-columns:repeat(6,1fr);
+  gap:0;
+}
+.loop-step{position:relative;padding:0 8px;text-align:center;}
+.loop-step::after{
+  content:"→";
+  position:absolute;
+  right:-7px;top:16px;
+  font-family:var(--mono);
+  color:var(--kb);
+  font-size:15px;
+  line-height:1;
+}
+.loop-step:last-child::after{content:none;}
+.loop-step .idx{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:34px;height:34px;
+  border-radius:50%;
+  background:var(--graphite);color:var(--kb);
+  font-family:var(--mono);font-size:12px;font-weight:600;
+  margin-bottom:9px;
+}
+.loop-step .nm{display:block;font-weight:700;font-size:15px;letter-spacing:-0.02em;}
+.loop-step .dsc{display:block;font-size:11.5px;color:var(--ink-faint);margin-top:3px;line-height:1.45;}
+.loop-return{
+  position:absolute;
+  left:calc(8.33% + 4px);
+  right:calc(8.33% + 4px);
+  bottom:30px;
+  height:34px;
+  border:2px solid var(--kb);
+  border-top:none;
+  border-radius:0 0 3px 3px;
+}
+.loop-return .lbl{
+  position:absolute;
+  left:50%;bottom:-13px;transform:translateX(-50%);
+  background:var(--card);
+  padding:0 12px;
+  font-family:var(--mono);
+  font-size:11.5px;
+  letter-spacing:0.1em;
+  color:var(--kb-ink);
+  white-space:nowrap;
+}
+.loop-return::before{
+  content:"◄";
+  position:absolute;left:-2px;bottom:-9px;
+  color:var(--kb);font-size:11px;line-height:1;
+}
+
+/* ---------- ai split ---------- */
+.aibox{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:3px;
+  padding:22px 24px;
+  margin:18px 0;
+}
+.aibox .hd{
+  display:flex;align-items:baseline;gap:12px;
+  border-bottom:1px solid var(--line-soft);
+  padding-bottom:12px;margin-bottom:14px;
+}
+.aibox .hd .tag{
+  font-family:var(--mono);font-size:11px;letter-spacing:0.1em;
+  background:var(--graphite);color:var(--kb);padding:3px 8px;border-radius:2px;
+}
+.aibox .hd h4{margin:0;font-size:17px;font-weight:700;letter-spacing:-0.03em;}
+.aibox .hd .role{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink-faint);}
+.aibox ul{margin:0;padding-left:19px;}
+.aibox li{margin:6px 0;font-size:14.5px;}
+.sample{
+  margin-top:14px;
+  padding:14px 16px;
+  background:#F6F7F5;
+  border-left:2px solid var(--ink-faint);
+  font-size:14px;
+  color:var(--ink-soft);
+  line-height:1.65;
+}
+.sample .t{font-family:var(--mono);font-size:10.5px;letter-spacing:0.14em;color:var(--ink-faint);display:block;margin-bottom:6px;}
+
+/* ---------- screens ---------- */
+.screens{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:20px 0;}
+.screen{
+  background:var(--card);border:1px solid var(--line);border-radius:3px;
+  padding:20px;
+}
+.screen .no{font-family:var(--mono);font-size:11px;color:var(--ink-faint);letter-spacing:0.1em;}
+.screen h4{margin:8px 0 12px;font-size:16px;font-weight:700;letter-spacing:-0.03em;}
+.screen ul{margin:0;padding-left:17px;font-size:13.5px;color:var(--ink-soft);}
+.screen li{margin:5px 0;}
+
+/* ---------- schedule ---------- */
+table.sched td:first-child{font-family:var(--mono);font-size:13px;white-space:nowrap;font-weight:500;}
+table.sched tr.crit td{background:#FFF8E2;}
+table.sched tr.crit td:first-child{box-shadow:inset 3px 0 0 var(--kb);}
+
+/* ---------- limits ---------- */
+.limits{list-style:none;margin:18px 0;padding:0;counter-reset:l;}
+.limits li{
+  counter-increment:l;
+  background:var(--card);
+  border:1px solid var(--line);
+  border-left:3px solid var(--rust);
+  border-radius:3px;
+  padding:15px 20px 15px 56px;
+  position:relative;
+  margin:9px 0;
+  font-size:15px;
+}
+.limits li::before{
+  content:counter(l);
+  position:absolute;left:20px;top:15px;
+  font-family:var(--mono);font-size:13px;font-weight:600;color:var(--rust);
+}
+
+footer{
+  margin-top:90px;padding-top:22px;
+  border-top:1px solid var(--line);
+  font-family:var(--mono);font-size:11.5px;letter-spacing:0.08em;
+  color:var(--ink-faint);
+  display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
+}
+
+/* ---------- responsive ---------- */
+@media (max-width:820px){
+  .screens{grid-template-columns:1fr;}
+}
+@media (max-width:700px){
+  body{font-size:15.5px;}
+  .wrap{padding:0 18px 80px;}
+  .hero{padding:44px 0 28px;}
+  .thesis{padding:22px 20px;}
+  .loop{padding:22px 18px 24px;}
+  .loop-track{grid-template-columns:repeat(2,1fr);gap:20px 0;}
+  .loop-step:nth-child(2n)::after{content:none;}
+  .loop-return{
+    position:static;height:auto;border:none;margin-top:20px;
+    border-top:2px solid var(--kb);padding-top:12px;text-align:center;
+  }
+  .loop-return::before{content:none;}
+  .loop-return .lbl{position:static;transform:none;display:inline-block;padding:0;}
+  .sec{margin-top:56px;}
+  .ledger-row{flex-wrap:wrap;gap:4px 12px;padding:12px 16px;}
+}
+
+@media (prefers-reduced-motion:no-preference){
+  .sec,.hero{animation:rise .5s ease-out both;}
+  @keyframes rise{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+}
+
+@media print{
+  body{background:#fff;}
+  .toc{display:none;}
+  .sec{page-break-inside:auto;margin-top:38px;animation:none;}
+  .sec-head{page-break-after:avoid;}
+  table{min-width:0;font-size:11pt;}
+  .thesis,.quote-one,thead th{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ HERO / 0. 한 줄 정의 ============ -->
+  <header class="hero" id="top">
+    <div class="tagstrip">
+      <span>제8회 KB A.I Challenge 제출용</span>
+      <span>마감 2026.8.3(월) 16:00</span>
+      <span class="dday">D-12</span>
+    </div>
+
+    <h1>
+      <span class="brand">R E A L P A Y</span>
+      KB AI Challenge<br>기획안 &amp; MVP 정의
+    </h1>
+
+    <div class="thesis">
+      <span class="eyebrow">00 · 한 줄 정의</span>
+      긱워커의 통장 입금을 보고, 올해 낼 세금을 예측해서,
+      매 입금마다 <em>자동으로 떼어놓는</em> AI 에이전트.
+    </div>
+
+    <nav class="toc" aria-label="목차">
+      <a href="#s1"><span class="n">01</span><span>문제</span></a>
+      <a href="#s2"><span class="n">02</span><span>차별점</span></a>
+      <a href="#s3"><span class="n">03</span><span>핵심 구조</span></a>
+      <a href="#s4"><span class="n">04</span><span>MVP 범위</span></a>
+      <a href="#s5"><span class="n">05</span><span>AI는 어디에</span></a>
+      <a href="#s6"><span class="n">06</span><span>데이터 계획</span></a>
+      <a href="#s7"><span class="n">07</span><span>화면 3개</span></a>
+      <a href="#s8"><span class="n">08</span><span>법적 검토</span></a>
+      <a href="#s9"><span class="n">09</span><span>일정</span></a>
+      <a href="#s10"><span class="n">10</span><span>먼저 말할 한계</span></a>
+    </nav>
+  </header>
+
+  <!-- ============ 1 ============ -->
+  <section class="sec" id="s1">
+    <div class="sec-head">
+      <span class="n">01</span>
+      <h2>문제</h2>
+      <span class="sub">왜 필요한가</span>
+    </div>
+
+    <h3 class="q"><span class="marker">①</span>긱워커는 세금을 “몰라서” 손해본다 — 국정감사 실사례</h3>
+    <p>같은 배달 라이더인데 업체마다 업종코드를 다르게 분류합니다.</p>
+
+    <div class="ledger">
+      <div class="ledger-row">
+        <span class="code">940909</span>
+        <span class="label">기타자영업으로 신고</span>
+        <span class="amt">환급금 376,190원</span>
+      </div>
+      <div class="ledger-row">
+        <span class="code">940918</span>
+        <span class="label">퀵서비스배달원으로 변경</span>
+        <span class="amt">환급금 590,718원</span>
+      </div>
+      <div class="ledger-row delta">
+        <span class="code">DIFF</span>
+        <span class="label">코드 하나 차이로 약 20만원</span>
+        <span class="amt">+214,528원</span>
+      </div>
+    </div>
+    <p class="src">출처: 2021 국회 기재위 국정감사, 김주영 의원 지적</p>
+
+    <h3 class="q"><span class="marker">②</span>소득이 불규칙해서 세금을 못 떼어놓는다</h3>
+    <p>
+      3.3% 원천징수만으로는 부족한데, 5월에 종합소득세 고지서를 받고 나서야 안다.
+      <strong>“이번 달에 얼마를 떼어놔야 하는지”</strong>를 알려주는 서비스가 없다.
+    </p>
+
+    <h3 class="q"><span class="marker">③</span>KB는 그릇만 만들고 내용물이 비어 있다</h3>
+    <p>
+      2026.6.30 KB 프리N통장 출시 — 긱워커 전용 파킹통장, 인컴박스로 입금 내역 관리.
+      하지만 <strong>인컴박스는 사용자가 직접 키워드를 등록하는 수동 폴더 기능</strong>이다.
+      판단하는 레이어가 없다.
+    </p>
+    <div class="call dark">
+      <span class="t">Positioning</span>
+      판단하는 레이어가 비어 있다. <strong>← 여기가 우리 자리</strong>
+    </div>
+  </section>
+
+  <!-- ============ 2 ============ -->
+  <section class="sec" id="s2">
+    <div class="sec-head">
+      <span class="n">02</span>
+      <h2>차별점</h2>
+      <span class="sub">삼쩜삼과 뭐가 다른가</span>
+    </div>
+
+    <div class="tablewrap">
+      <table class="compare">
+        <thead>
+          <tr><th></th><th>삼쩜삼</th><th>RealPay</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="key">데이터</td><td>홈택스 (국세청)</td><td>통장 입금 원장</td></tr>
+          <tr><td class="key">시점</td><td>작년 것을 환급</td><td>지금 것을 예방</td></tr>
+          <tr><td class="key">시차</td><td>1년 뒤</td><td>실시간</td></tr>
+          <tr><td class="key">행동</td><td>알려줌</td><td>자동으로 떼어놓음</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="quote-one">
+      <span class="t">한 문장</span>
+      삼쩜삼은 작년에 낸 세금을 돌려받고, RealPay는 올해 낼 세금을 미리 떼어놓는다.
+    </div>
+  </section>
+
+  <!-- ============ 3 ============ -->
+  <section class="sec" id="s3">
+    <div class="sec-head">
+      <span class="n">03</span>
+      <h2>핵심 구조</h2>
+      <span class="sub">에이전트 루프</span>
+    </div>
+
+    <div class="loop">
+      <div class="loop-track">
+        <div class="loop-step"><span class="idx">01</span><span class="nm">감지</span><span class="dsc">입금 발생</span></div>
+        <div class="loop-step"><span class="idx">02</span><span class="nm">분류</span><span class="dsc">업종코드 판별</span></div>
+        <div class="loop-step"><span class="idx">03</span><span class="nm">예측</span><span class="dsc">소득 추정</span></div>
+        <div class="loop-step"><span class="idx">04</span><span class="nm">결정</span><span class="dsc">적립액 산출</span></div>
+        <div class="loop-step"><span class="idx">05</span><span class="nm">실행</span><span class="dsc">세금 금고 이체</span></div>
+        <div class="loop-step"><span class="idx">06</span><span class="nm">검증</span><span class="dsc">실제 세액 대조</span></div>
+      </div>
+      <div class="loop-return"><span class="lbl">↺ 다시 감지</span></div>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>단계</th><th>하는 일</th><th>기술</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="key">감지</td><td>프리N통장 입금 발생</td><td>이벤트 트리거</td></tr>
+          <tr><td class="key">분류</td><td>플랫폼 식별 → 최적 업종코드 판별</td><td>룰 + 매핑</td></tr>
+          <tr><td class="key">예측</td><td>다음 달 / 연간 소득 추정</td><td><strong>ML (LightGBM)</strong></td></tr>
+          <tr><td class="key">결정</td><td>이번 입금에서 떼어놓을 금액 산출</td><td>세법 룰 엔진</td></tr>
+          <tr><td class="key">실행</td><td>세금 금고로 자동 이체</td><td>(프로토타입: 시뮬레이션)</td></tr>
+          <tr><td class="key">검증</td><td>5월 실제 세액과 대조 → 적립률 자동 보정</td><td>피드백 루프</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="call">
+      <span class="t">왜 “실행”이 중요한가</span>
+      예측해서 알려주는 서비스는 이미 많다. 실제로 돈을 떼어놓는 순간
+      “판단하는 AI”가 아니라 <strong>“행동하는 AI”</strong>가 된다. ← 심사 차별점
+    </div>
+
+    <div class="call">
+      <span class="t">KB에게 이득인 이유</span>
+      세금 적립금은 1년 내내 통장에 묶이는 예수금.
+      프리N통장(파킹통장, 최고 1.4%)의 <strong>잔고를 늘리는 것과 목적이 정확히 일치</strong>.
+    </div>
+  </section>
+
+  <!-- ============ 4 ============ -->
+  <section class="sec" id="s4">
+    <div class="sec-head">
+      <span class="n">04</span>
+      <h2>MVP 범위</h2>
+      <span class="sub">이것만 만든다</span>
+    </div>
+
+    <h4 class="sh pos"><span class="dot"></span>포함</h4>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>기능</th><th>산출물</th></tr></thead>
+        <tbody>
+          <tr><td class="key">온보딩 설문 (7문항)</td><td>콜드스타트 초기 프로파일</td></tr>
+          <tr><td class="key">입금 내역 분류</td><td>플랫폼 → 업종 매핑</td></tr>
+          <tr><td class="key"><strong>업종코드 최적화 추천</strong></td><td>후보 코드별 세액 비교 → 최적 추천</td></tr>
+          <tr><td class="key"><strong>소득 예측</strong></td><td>다음 달 / 연간 예상 소득</td></tr>
+          <tr><td class="key">세금 적립액 산출</td><td>입금 건당 떼어놓을 금액</td></tr>
+          <tr><td class="key">자동 적립 (시뮬레이션)</td><td>세금 금고 잔고 표시</td></tr>
+          <tr><td class="key"><strong>XAI 근거 표시</strong></td><td>SHAP — 왜 이 예측이 나왔는지</td></tr>
+          <tr><td class="key"><strong>LLM 리포트</strong></td><td>수치 → 자연어 인사이트</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h4 class="sh neg"><span class="dot"></span>제외 <span class="mono" style="color:var(--ink-faint);font-weight:400;">— PPT에 “향후 과제”로 명시</span></h4>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>제외 항목</th><th>이유</th></tr></thead>
+        <tbody>
+          <tr><td class="key"><strong>지출 분류 / 경비 최적화</strong></td><td>단순경비율 대상자는 실제 지출이 세금에 영향 없음. 실익 대비 공수 과다</td></tr>
+          <tr><td class="key">조작 검증 로직</td><td>향후 방향성으로 명시. 지금은 “계좌 원장 기반이라 수기 가계부보다 신뢰도 높음”까지만 주장</td></tr>
+          <tr><td class="key">실제 계좌 이체 연동</td><td>KB 계정계 연동 필요 영역</td></tr>
+          <tr><td class="key">금융상품 추천</td><td>금융소비자보호법 리스크. 굳이 안 건드림</td></tr>
+          <tr><td class="key">심사역 화면</td><td>B2B는 이번 범위 아님</td></tr>
+          <tr><td class="key">마이데이터 타행 연동</td><td>향후 확장</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="call warn">
+      <span class="t">작성 원칙</span>
+      <strong>제외 항목을 숨기지 말고 “인지하고 의도적으로 뺐다”고 쓸 것.</strong><br>
+      한계를 아는 팀이 더 신뢰받는다.
+    </div>
+  </section>
+
+  <!-- ============ 5 ============ -->
+  <section class="sec" id="s5">
+    <div class="sec-head">
+      <span class="n">05</span>
+      <h2>AI는 어디에 들어가는가</h2>
+      <span class="sub">2곳</span>
+    </div>
+
+    <div class="call warn">
+      <span class="t">경고</span>
+      대회 이름이 AI Challenge다. <strong>“AI 어디 있나요” 질문 하나로 떨어질 수 있음.</strong>
+    </div>
+
+    <div class="aibox">
+      <div class="hd">
+        <span class="tag">①</span>
+        <h4>소득 예측</h4>
+        <span class="role">핵심 축</span>
+      </div>
+      <ul>
+        <li>모델: <strong>LightGBM</strong> (12일이니 복잡한 시계열 모델 금지)</li>
+        <li>입력: 과거 월별 소득, 근무일수, 플랫폼 수, 계절/공휴일, 요일 패턴</li>
+        <li>출력: 다음 달 예상 소득, 연간 누적 예상</li>
+        <li><strong>SHAP</strong>으로 기여도 시각화 → “비수기 −18%, 플랫폼 정산주기 변동 −7%”</li>
+      </ul>
+    </div>
+
+    <div class="aibox">
+      <div class="hd">
+        <span class="tag">②</span>
+        <h4>LLM 리포트 생성</h4>
+        <span class="role">보조 축</span>
+      </div>
+      <ul>
+        <li>수치를 자연어 인사이트로 변환</li>
+      </ul>
+      <div class="sample">
+        <span class="t">출력 예시</span>
+        “이번 달은 지난 3개월 평균보다 12% 낮습니다. 연간 예상 소득이 2,400만원 아래로 내려가면 단순경비율 대상이 유지됩니다.”
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 6 ============ -->
+  <section class="sec" id="s6">
+    <div class="sec-head">
+      <span class="n">06</span>
+      <h2>데이터 계획</h2>
+      <span class="sub">Mock + 근거</span>
+    </div>
+
+    <p><strong>실데이터가 없으므로 목데이터를 생성한다. 대신 근거를 붙인다.</strong></p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>항목</th><th>내용</th></tr></thead>
+        <tbody>
+          <tr><td class="key">규모</td><td>가상 긱워커 300~500명 × 24개월</td></tr>
+          <tr><td class="key">분포 파라미터 근거</td><td>국세청 업종코드별 경비율 고시 (공공데이터포털) + 고용노동부 플랫폼종사자 실태조사</td></tr>
+          <tr><td class="key">소득 유형</td><td>규칙형 / 계절형 / 불규칙형</td></tr>
+          <tr><td class="key">검증 방식</td><td><strong>시계열 예측 성능(MAE/MAPE)으로 평가</strong> — 클러스터 라벨 복원이 아님</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h4 class="sh"><span class="dot"></span>콜드스타트 처리 <span class="mono" style="color:var(--ink-faint);font-weight:400;">— 프리N통장이 2026.6.30 출시라 아무도 이력이 없음</span></h4>
+    <ol class="steps">
+      <li>가입 직후 → 온보딩 설문으로 초기 프로파일 생성</li>
+      <li>3개월 누적 → 실데이터로 전환</li>
+      <li>설문과 실데이터가 충돌하면 <strong>실데이터 우선</strong></li>
+    </ol>
+  </section>
+
+  <!-- ============ 7 ============ -->
+  <section class="sec" id="s7">
+    <div class="sec-head">
+      <span class="n">07</span>
+      <h2>화면 3개</h2>
+      <span class="sub">핵심 요소</span>
+    </div>
+
+    <div class="screens">
+      <div class="screen">
+        <span class="no">SCREEN 1</span>
+        <h4>온보딩 설문</h4>
+        <ul>
+          <li>직업</li>
+          <li>주수입원</li>
+          <li>플랫폼 개수</li>
+          <li>평균 근무일 등 7문항</li>
+        </ul>
+      </div>
+      <div class="screen">
+        <span class="no">SCREEN 2</span>
+        <h4>대시보드</h4>
+        <ul>
+          <li>이번 달 소득</li>
+          <li>적립 필요액</li>
+          <li>세금 금고 잔고</li>
+          <li>예측 그래프</li>
+        </ul>
+      </div>
+      <div class="screen">
+        <span class="no">SCREEN 3</span>
+        <h4>리포트</h4>
+        <ul>
+          <li>연간 예상 세액</li>
+          <li>업종코드 추천(+절세액)</li>
+          <li>SHAP 근거</li>
+          <li>LLM 요약</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 8 ============ -->
+  <section class="sec" id="s8">
+    <div class="sec-head">
+      <span class="n">08</span>
+      <h2>법적 검토</h2>
+      <span class="sub">후원사가 금융감독원</span>
+    </div>
+
+    <p>발표에서 물어볼 수 있음.</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>쟁점</th><th>결론</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="key">신용평가업 허가 필요?</td>
+            <td><span class="no">아니오.</span> 개인신용평가업은 “제3자 제공을 영업으로” 하는 경우. 우리는 본인에게 본인 정보 제공</td>
+          </tr>
+          <tr>
+            <td class="key">세무사법 위반?</td>
+            <td><span class="no">아니오.</span> 삼쩜삼 사건 — 2022 경찰 불송치, 2023 검찰 불기소, 2025.6 대검 재항고 기각으로 최종 확정. 단 <strong>신고 대행은 하지 않음</strong></td>
+          </tr>
+          <tr>
+            <td class="key">자동화 결정 규제?</td>
+            <td><strong>해당 없음.</strong> 최종 판단은 사용자. AI는 제안만</td>
+          </tr>
+          <tr>
+            <td class="key">필수 조치</td>
+            <td>① “예상치” 면책 문구 &nbsp;② “신용점수”라는 단어 사용 금지 &nbsp;③ 본인 동의 기반 데이터</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ 9 ============ -->
+  <section class="sec" id="s9">
+    <div class="sec-head">
+      <span class="n">09</span>
+      <h2>일정</h2>
+      <span class="sub">D-12</span>
+    </div>
+
+    <div class="tablewrap">
+      <table class="sched">
+        <thead><tr><th>기간</th><th>할 일</th><th>게이트</th></tr></thead>
+        <tbody>
+          <tr class="crit">
+            <td><strong>7/23~24</strong></td>
+            <td>스펙 확정 · <strong>데이터 스키마 + API 계약 고정</strong></td>
+            <td>여기서 막히면 전부 막힘. 최우선</td>
+          </tr>
+          <tr>
+            <td>7/25~28</td>
+            <td>3인 병렬 모듈 개발</td>
+            <td>각자 단독 실행 가능 상태</td>
+          </tr>
+          <tr>
+            <td>7/29~30</td>
+            <td>통합</td>
+            <td>End-to-end 1회 관통</td>
+          </tr>
+          <tr>
+            <td>7/31~8/1</td>
+            <td>PPT + 데모 시나리오</td>
+            <td>발표 스토리 완성</td>
+          </tr>
+          <tr class="crit">
+            <td>8/2</td>
+            <td>리허설 · 버그 수정 · <strong>제출 완료</strong></td>
+            <td>하루 버퍼 확보</td>
+          </tr>
+          <tr>
+            <td>8/3 오전</td>
+            <td>예비일 (마감 16:00)</td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="call dark">
+      <span class="t">Deadline Rule</span>
+      <strong>8/2 밤까지 제출 완료가 목표. 8/3은 손대지 않는다.</strong>
+    </div>
+  </section>
+
+  <!-- ============ 10 ============ -->
+  <section class="sec" id="s10">
+    <div class="sec-head">
+      <span class="n">10</span>
+      <h2>발표에서 먼저 말할 한계</h2>
+      <span class="sub">숨기면 지적당함</span>
+    </div>
+
+    <ol class="limits">
+      <li>목데이터 기반 — 실데이터 미확보 (분포는 공공 통계 근거)</li>
+      <li>자동 이체는 시뮬레이션 — 실제 연동은 KB 계정계 필요</li>
+      <li>인컴박스 태깅 조작 가능성 — 검증 로직은 향후 과제</li>
+      <li>세액은 예상치 — 인적공제/세액공제 반영 범위 제한</li>
+    </ol>
+  </section>
+
+  <footer>
+    <span>RealPay · 제8회 KB A.I Challenge</span>
+    <span><a href="#top" style="text-decoration:none;">맨 위로 ↑</a></span>
+    <span>마감 2026.8.3 16:00</span>
+  </footer>
+
+</div>
+</body>
+</html>

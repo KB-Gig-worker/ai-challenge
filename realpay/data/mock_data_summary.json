@@ -1,0 +1,15 @@
+{
+  "n_workers": 400,
+  "n_deposit_rows": 9600,
+  "pattern_counts": {
+    "regular": 183,
+    "seasonal": 130,
+    "irregular": 87
+  },
+  "avg_monthly_income": 2036100.0,
+  "income_range": [
+    55000,
+    5916000
+  ],
+  "seed": 20260723
+}

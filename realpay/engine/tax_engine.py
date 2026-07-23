@@ -1,0 +1,141 @@
+# -*- coding: utf-8 -*-
+"""
+세법 룰 엔진 — 기획안 03. 핵심 구조 / "결정" 단계, 08. 법적 검토 반영.
+
+단순화 가정 (데모용, README에도 명시):
+  - 소득공제는 '기본공제(본인 1인, 150만원)'만 반영. 인적공제/세액공제 등은 생략
+    (기획안 10. 한계 ④ "세액은 예상치 — 인적공제/세액공제 반영 범위 제한"과 일치).
+  - 단순경비율 대상자(직전연도 수입금액 기준 이하)만 다룬다. 기준경비율 대상은 다루지 않음.
+  - 지방소득세(소득세의 10%)를 합산해 '실효 결정세액'을 계산한다.
+  - 3.3% 원천징수는 '기납부세액'으로 차감한다.
+
+2025년 종합소득세 누진세율표(단위: 원) — 실제 세율표를 그대로 사용.
+"""
+
+from dataclasses import dataclass
+
+from data.industry_codes import INDUSTRY_CODES, get_candidate_codes
+
+BASIC_DEDUCTION = 1_500_000  # 본인 기본공제
+WITHHOLDING_RATE = 0.033  # 3.3% 원천징수 (사업소득)
+LOCAL_TAX_RATE = 0.10  # 지방소득세 = 소득세의 10%
+
+# (하한, 상한, 세율, 누진공제)
+TAX_BRACKETS_2025 = [
+    (0, 14_000_000, 0.06, 0),
+    (14_000_000, 50_000_000, 0.15, 1_260_000),
+    (50_000_000, 88_000_000, 0.24, 5_760_000),
+    (88_000_000, 150_000_000, 0.35, 15_440_000),
+    (150_000_000, 300_000_000, 0.38, 19_940_000),
+    (300_000_000, 500_000_000, 0.40, 25_940_000),
+    (500_000_000, 1_000_000_000, 0.42, 35_940_000),
+    (1_000_000_000, float("inf"), 0.45, 65_940_000),
+]
+
+SIMPLE_EXPENSE_RATE_CAP_INCOME = 24_000_000  # 단순경비율 적용 유지 기준(데모 근사치)
+
+
+@dataclass
+class TaxResult:
+    industry_code: str
+    industry_name: str
+    annual_income: int
+    expense_rate: float
+    necessary_expense: int
+    taxable_income: int  # 소득금액 (수입 - 필요경비)
+    tax_base: int  # 과세표준 (소득금액 - 기본공제)
+    income_tax: int  # 종합소득세 산출세액
+    local_tax: int  # 지방소득세
+    total_tax: int  # 총 결정세액(소득세+지방세)
+    withheld_tax: int  # 기납부(원천징수 3.3%) 추정액
+    additional_payment: int  # 5월에 추가로 낼 것으로 예상되는 금액 (총세액 - 기납부, 음수면 환급)
+
+
+def progressive_tax(tax_base: int) -> int:
+    """과세표준에 누진세율을 적용해 산출세액을 계산한다."""
+    if tax_base <= 0:
+        return 0
+    for lower, upper, rate, deduction in TAX_BRACKETS_2025:
+        if lower < tax_base <= upper or (upper == float("inf") and tax_base > lower):
+            return max(0, round(tax_base * rate - deduction))
+    return 0
+
+
+def compute_tax(annual_income: int, industry_code: str) -> TaxResult:
+    """연간 수입금액과 업종코드로 종합소득세 예상액을 계산한다 (단순경비율 방식)."""
+    info = INDUSTRY_CODES[industry_code]
+    expense = round(annual_income * info.simple_expense_rate)
+    taxable_income = max(0, annual_income - expense)
+    tax_base = max(0, taxable_income - BASIC_DEDUCTION)
+    income_tax = progressive_tax(tax_base)
+    local_tax = round(income_tax * LOCAL_TAX_RATE)
+    total_tax = income_tax + local_tax
+    withheld = round(annual_income * WITHHOLDING_RATE)
+    additional = total_tax - withheld
+
+    return TaxResult(
+        industry_code=industry_code,
+        industry_name=info.name,
+        annual_income=annual_income,
+        expense_rate=info.simple_expense_rate,
+        necessary_expense=expense,
+        taxable_income=taxable_income,
+        tax_base=tax_base,
+        income_tax=income_tax,
+        local_tax=local_tax,
+        total_tax=total_tax,
+        withheld_tax=withheld,
+        additional_payment=additional,
+    )
+
+
+def effective_reserve_rate(annual_income: int, industry_code: str) -> float:
+    """이 예상 연소득 기준 '입금액 대비 몇 %를 떼어놔야 하는가' 실효 적립률.
+
+    3.3% 원천징수만으로 부족한 부분(= 5월에 추가로 낼 돈)을
+    연간 수입금액 대비 비율로 환산한다. 04. MVP 범위 '세금 적립액 산출'.
+    """
+    if annual_income <= 0:
+        return WITHHOLDING_RATE
+    result = compute_tax(annual_income, industry_code)
+    shortfall = max(0, result.additional_payment)
+    extra_rate = shortfall / annual_income
+    return WITHHOLDING_RATE + extra_rate
+
+
+def compute_deposit_reserve(deposit_amount: int, predicted_annual_income: int, industry_code: str) -> dict:
+    """입금 1건이 들어왔을 때, 이번 건에서 세금 금고로 떼어놓을 금액을 산출한다.
+
+    05. 핵심 구조 '실행' 단계에 대응. 실제 이체는 시뮬레이션(기획안 04. 제외 항목).
+    """
+    rate = effective_reserve_rate(predicted_annual_income, industry_code)
+    reserve = round(deposit_amount * rate)
+    return {
+        "deposit_amount": deposit_amount,
+        "reserve_rate": round(rate, 4),
+        "reserve_amount": reserve,
+        "net_after_reserve": deposit_amount - reserve,
+    }
+
+
+def compare_industry_codes(annual_income: int, candidate_codes: list) -> list:
+    """후보 업종코드별 세액을 비교해 정렬된 리스트로 반환한다.
+    01. 문제 ① 국정감사 실사례(940909 vs 940918)를 재현하는 로직."""
+    results = [compute_tax(annual_income, code) for code in candidate_codes]
+    results.sort(key=lambda r: r.total_tax)
+    return results
+
+
+def recommend_industry_code(annual_income: int, platform: str) -> dict:
+    """플랫폼명 -> 후보 코드 산출 -> 세액 비교 -> 최적 코드 추천."""
+    candidates = get_candidate_codes(platform)
+    ranked = compare_industry_codes(annual_income, candidates)
+    best = ranked[0]
+    worst = ranked[-1]
+    savings = worst.total_tax - best.total_tax
+    return {
+        "platform": platform,
+        "candidates": ranked,
+        "recommended": best,
+        "max_savings_vs_worst": savings,
+    }

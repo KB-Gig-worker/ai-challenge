@@ -1,0 +1,27 @@
+{
+  "n_train": 6400,
+  "n_test": 1600,
+  "best_iteration": 139,
+  "mae": 251399.0,
+  "mape": 0.2163,
+  "baseline_mae_roll3mean": 291470.0,
+  "improvement_vs_baseline_pct": 13.7,
+  "feature_columns": [
+    "lag1_income",
+    "lag2_income",
+    "lag3_income",
+    "roll3_mean_income",
+    "roll6_mean_income",
+    "roll3_std_income",
+    "workdays",
+    "workdays_ratio",
+    "n_platforms_active",
+    "is_holiday_season",
+    "month_sin",
+    "month_cos",
+    "months_since_start",
+    "pattern_regular",
+    "pattern_seasonal",
+    "pattern_irregular"
+  ]
+}
