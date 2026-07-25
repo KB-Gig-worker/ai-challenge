@@ -4,6 +4,7 @@
 입력: 과거 월별 소득, 근무일수, 플랫폼 수, 계절/공휴일, (요일 패턴 대용으로 근무일수 비율)
 출력: 다음 달 예상 소득을 맞추기 위한 학습용 피처 테이블
 """
+import calendar
 
 import numpy as np
 import pandas as pd
@@ -45,8 +46,8 @@ def build_feature_table(deposits_df: pd.DataFrame) -> pd.DataFrame:
         lambda s: s.shift(1).rolling(3, min_periods=1).std()
     ).fillna(0)
 
-    df["workdays_ratio"] = df["workdays"] / df["workdays"].replace(0, np.nan).clip(lower=1)
-    df["workdays_ratio"] = df["workdays_ratio"].fillna(0)
+    df["days_in_month"] = df.apply(lambda r: calendar.monthrange(int(r["year"]), int(r["month"]))[1], axis=1)
+    df["workdays_ratio"] = (df["workdays"] / df["days_in_month"]).clip(0, 1)
 
     df["month_sin"] = np.sin(2 * np.pi * df["month"] / 12)
     df["month_cos"] = np.cos(2 * np.pi * df["month"] / 12)
