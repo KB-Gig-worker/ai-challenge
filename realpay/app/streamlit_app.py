@@ -201,7 +201,7 @@ elif screen == "② 대시보드":
         xaxis_title="개월차", yaxis_title="소득(원)",
         legend=dict(orientation="h", yanchor="bottom", y=1.02),
     )
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, use_container_width=True)
 
 
 # ---------------------------------------------------------------- screen 3
@@ -252,7 +252,7 @@ else:
             "예상 총세액": f"{r.total_tax:,}원",
             "추천": "⭐ 최적" if r.industry_code == rec["recommended"].industry_code else "",
         })
-    st.dataframe(pd.DataFrame(rows), width='stretch', hide_index=True)
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
     if rec["max_savings_vs_worst"] > 0:
         st.info(f"최적 코드로 신고하면 최대 **{rec['max_savings_vs_worst']:,}원** 절세 효과가 있습니다.")
 
@@ -267,7 +267,7 @@ else:
         marker_color=["#A8382A" if f["shap"] < 0 else "#0F6B60" for f in factors],
     ))
     fig2.update_layout(height=300, margin=dict(l=10, r=10, t=10, b=10), xaxis_title="다음 달 예측치에 대한 영향(원)")
-    st.plotly_chart(fig2, width='stretch')
+    st.plotly_chart(fig2, use_container_width=True)
 
     st.divider()
     st.subheader("LLM 요약")
