@@ -10,6 +10,7 @@ RealPay MVP 데모 — 기획안 07. 화면 3개.
     python scripts/run_pipeline.py
 """
 
+import json
 import sys
 from pathlib import Path
 
@@ -165,13 +166,16 @@ elif screen == "② 대시보드":
         predicted_annual = predictor.predict_annual(latest_row)
         reserve_rate_source = "LightGBM 모델 예측"
 
-    tax_result = compute_tax(int(predicted_annual), "940909")
-    reserve_info = compute_deposit_reserve(this_month_income, int(predicted_annual), "940909")
+    rec = recommend_industry_code(int(predicted_annual), worker_row["primary_platform"])
+    industry_code = rec["recommended"].industry_code
+
+    tax_result = compute_tax(int(predicted_annual), industry_code)
+    reserve_info = compute_deposit_reserve(this_month_income, int(predicted_annual), industry_code)
 
     # 세금 금고 잔고: 이력 전체에 대해 매달 적립했다고 가정하고 누적
     vault_balance = 0
     for _, row in worker_deposits.iterrows():
-        r = compute_deposit_reserve(int(row["monthly_income"]), max(int(predicted_annual), 1), "940909")
+        r = compute_deposit_reserve(int(row["monthly_income"]), max(int(predicted_annual), 1), industry_code)
         vault_balance += r["reserve_amount"]
 
     c1, c2, c3, c4 = st.columns(4)
@@ -284,3 +288,24 @@ else:
     report_text, source = generate_llm_report(ctx)
     st.markdown(f"> {report_text}")
     st.caption(f"생성 방식: `{source}`" + ("" if source == "claude-api" else " (ANTHROPIC_API_KEY 미설정 — 템플릿 폴백)"))
+
+    st.divider()
+    st.subheader("모델 비교 — 왜 LightGBM인가")
+    st.caption("5-fold 교차검증(worker 단위)으로 4개 모델을 공정 비교한 결과입니다. "
+               "실제 예측/적립액 계산에는 LightGBM만 사용됩니다.")
+
+    comparison_path = ROOT / "model" / "artifacts" / "model_comparison.json"
+    if comparison_path.exists():
+        with open(comparison_path, encoding="utf-8") as f:
+            comparison = json.load(f)
+        comp_rows = []
+        for name, r in comparison.items():
+            comp_rows.append({
+                "모델": name,
+                "평균 MAE": f"{r['cv_mae_mean']:,.0f}원",
+                "표준편차": f"± {r['cv_mae_std']:,.0f}원",
+                "채택 여부": "⭐ 최종 채택" if name == "LightGBM" else "",
+            })
+        st.dataframe(pd.DataFrame(comp_rows), use_container_width=True, hide_index=True)
+    else:
+        st.caption("비교 결과가 없습니다. `python model/compare_baselines.py` 를 먼저 실행하세요.")

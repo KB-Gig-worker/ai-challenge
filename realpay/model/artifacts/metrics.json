@@ -6,6 +6,16 @@
   "mape": 0.217,
   "baseline_mae_roll3mean": 291470.0,
   "improvement_vs_baseline_pct": 13.6,
+  "cv_folds": 5,
+  "cv_mae_per_fold": [
+    281589.0,
+    293433.0,
+    288955.0,
+    248711.0,
+    252771.0
+  ],
+  "cv_mae_mean": 273092.0,
+  "cv_mae_std": 18681.0,
   "feature_columns": [
     "lag1_income",
     "lag2_income",

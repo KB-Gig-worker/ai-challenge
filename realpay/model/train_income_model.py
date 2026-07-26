@@ -15,7 +15,7 @@ from pathlib import Path
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import GroupShuffleSplit
+from sklearn.model_selection import GroupShuffleSplit, GroupKFold
 from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -87,6 +87,28 @@ def main():
     baseline_preds = X_test["roll3_mean_income"].values  # naive baseline: 최근 3개월 평균
     baseline_mae = mean_absolute_error(y_test, baseline_preds)
 
+    # --- 교차검증: MAE가 특정 split에 우연히 좋게/나쁘게 나온 게 아닌지 확인 (worker 단위 5-fold) ---
+    gkf = GroupKFold(n_splits=5)
+    cv_maes = []
+    for fold_idx, (tr_idx, te_idx) in enumerate(gkf.split(X, y, groups=groups)):
+        X_tr, X_te = X.iloc[tr_idx], X.iloc[te_idx]
+        y_tr, y_te = y.iloc[tr_idx], y.iloc[te_idx]
+        fold_train_set = lgb.Dataset(X_tr, label=y_tr)
+        fold_valid_set = lgb.Dataset(X_te, label=y_te, reference=fold_train_set)
+        fold_model = lgb.train(
+            params,
+            fold_train_set,
+            num_boost_round=500,
+            valid_sets=[fold_valid_set],
+            valid_names=["valid"],
+            callbacks=[lgb.early_stopping(30, verbose=False), lgb.log_evaluation(0)],
+        )
+        fold_preds = np.clip(fold_model.predict(X_te, num_iteration=fold_model.best_iteration), 0, None)
+        cv_maes.append(float(mean_absolute_error(y_te, fold_preds)))
+
+    cv_mae_mean = float(np.mean(cv_maes))
+    cv_mae_std = float(np.std(cv_maes))
+
     metrics = {
         "n_train": int(len(X_train)),
         "n_test": int(len(X_test)),
@@ -95,6 +117,10 @@ def main():
         "mape": round(float(mape), 4),
         "baseline_mae_roll3mean": round(float(baseline_mae), 0),
         "improvement_vs_baseline_pct": round(float(1 - mae / baseline_mae) * 100, 1) if baseline_mae else None,
+        "cv_folds": 5,
+        "cv_mae_per_fold": [round(v, 0) for v in cv_maes],
+        "cv_mae_mean": round(cv_mae_mean, 0),
+        "cv_mae_std": round(cv_mae_std, 0),
         "feature_columns": FEATURE_COLUMNS,
     }
 

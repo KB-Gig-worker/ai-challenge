@@ -24,7 +24,8 @@ def run(cmd, cwd):
 def main():
     run([sys.executable, "generate_mock_data.py"], cwd=ROOT / "data")
     run([sys.executable, "train_income_model.py"], cwd=ROOT / "model")
-    print("\n[DONE] 목데이터 + 모델 아티팩트 준비 완료.")
+    run([sys.executable, "compare_baselines.py"], cwd=ROOT / "model")
+    print("\n[DONE] 목데이터 + 모델 아티팩트 + 베이스라인 비교 준비 완료.")
     print("데모 실행: streamlit run app/streamlit_app.py  (realpay/ 디렉토리에서)")
 
 
