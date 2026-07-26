@@ -376,7 +376,7 @@ elif active_screen == "② 대시보드":
     c1, c2, c3 = st.columns(3)
     c1.metric("이번 달 소득", f"{this_month_income:,}원")
     c2.metric("이번 입금 적립액", f"{reserve_info['reserve_amount']:,}원", f"{reserve_info['reserve_rate']*100:.1f}%")
-    c3.metric("다음 달 예상", f"{predicted_next_month:,.0f}원", reserve_rate_source)
+    c3.metric("다음 달 예상 소득", f"{predicted_next_month:,.0f}원", reserve_rate_source)
 
     st.divider()
     st.subheader("예측 그래프 — 실제 vs 예측")
