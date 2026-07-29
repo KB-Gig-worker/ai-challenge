@@ -8,6 +8,10 @@ RealPay MVP 데모 — 기획안 07. 화면 3개.
 
 사전 준비(최초 1회 또는 데이터/모델 갱신 시):
     python scripts/run_pipeline.py
+
+앱 흐름: 계좌(worker_id) 조회 -> 이력 3개월 미만이면 온보딩 설문 자동 진입 ->
+        완료/기존회원이면 대시보드로 자동 진입. 사이드바 "데모/발표용 컨트롤"에서
+        발표 중 다른 워커 프로필로 즉시 전환 가능(로그인 절차 우회).
 """
 
 import json
@@ -34,7 +38,105 @@ from report.llm_report import build_insight_context, generate_llm_report  # noqa
 
 st.set_page_config(page_title="RealPay · KB AI Challenge", page_icon="\U0001F4B0", layout="wide")
 
+st.markdown("""
+<style>
+:root {
+    --kb-yellow: #FFBC00;
+    --kb-dark: #17171A;
+}
+
+.main .block-container {
+    max-width: 480px;
+    padding-top: 1.5rem;
+    padding-bottom: 4rem;
+    padding-left: 1.2rem;
+    padding-right: 1.2rem;
+}
+
+[data-testid="stAppViewContainer"] {
+    background-color: #FAFAFA;
+}
+
+[data-testid="stSidebar"] {
+    background-color: var(--kb-dark);
+}
+[data-testid="stSidebar"] * {
+    color: #F5F5F7 !important;
+}
+
+h1 {
+    font-size: 1.4rem !important;
+    font-weight: 800 !important;
+    color: var(--kb-dark) !important;
+}
+h2, h3 {
+    color: var(--kb-dark) !important;
+}
+
+div[data-testid="stMetric"] {
+    background: white;
+    border-radius: 16px;
+    padding: 14px 16px;
+    border: 1px solid #ECECEE;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+div[data-testid="stMetricValue"] {
+    color: var(--kb-dark);
+    font-weight: 700;
+}
+div[data-testid="stMetricLabel"] {
+    color: #8A8A93;
+}
+
+.stButton>button, [data-testid="stFormSubmitButton"] button {
+    background-color: var(--kb-yellow) !important;
+    color: var(--kb-dark) !important;
+    border-radius: 12px !important;
+    border: none !important;
+    font-weight: 700 !important;
+    padding: 0.6rem 1rem !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 DATA_DIR = ROOT / "data"
+
+PATTERN_GUESS_MAP = {
+    "매달 비슷해요(규칙형)": "regular",
+    "성수기/비수기가 뚜렷해요(계절형)": "seasonal",
+    "달마다 들쭉날쭉해요(불규칙형)": "irregular",
+}
+
+
+def estimate_from_similar_workers(profile: dict, workers_df: pd.DataFrame, deposits_df: pd.DataFrame) -> dict:
+    """온보딩 설문 답변(플랫폼, 소득패턴)으로 비슷한 워커들을 찾아 평균 소득을 추정치로 사용.
+    본인이 직접 적은 예상소득과 코호트 평균을 절반씩 섞어 최종 추정치를 만든다."""
+    pattern = PATTERN_GUESS_MAP.get(profile.get("pattern_guess"))
+    platform = profile.get("primary_income")
+
+    matched = workers_df[(workers_df["primary_platform"] == platform) & (workers_df["pattern"] == pattern)]
+    match_desc = f"플랫폼({platform}) + 소득패턴 모두 일치"
+    if matched.empty:
+        matched = workers_df[workers_df["primary_platform"] == platform]
+        match_desc = f"플랫폼({platform})만 일치"
+    if matched.empty:
+        matched = workers_df[workers_df["pattern"] == pattern]
+        match_desc = "소득패턴만 일치"
+    if matched.empty:
+        matched = workers_df
+        match_desc = "일치하는 조건 없음 (전체 워커 평균)"
+
+    matched_deposits = deposits_df[deposits_df["worker_id"].isin(matched["worker_id"])]
+    self_report = float(profile["expected_monthly"])
+    cohort_avg = float(matched_deposits["monthly_income"].mean()) if len(matched_deposits) else self_report
+
+    return {
+        "blended_estimate": 0.5 * self_report + 0.5 * cohort_avg,
+        "cohort_avg": cohort_avg,
+        "self_report": self_report,
+        "n_matched_workers": int(len(matched)),
+        "match_desc": match_desc,
+    }
 
 
 # ---------------------------------------------------------------- data/model
@@ -69,41 +171,117 @@ if workers_df is None or predictor is None:
     st.stop()
 
 
-# ---------------------------------------------------------------- sidebar
+# ---------------------------------------------------------------- 세션 상태 초기화
+
+for key, default in [
+    ("logged_in_worker_id", None),
+    ("is_new_signup", False),
+    ("onboarding_done", False),
+    ("onboarding_profile", None),
+]:
+    if key not in st.session_state:
+        st.session_state[key] = default
+
+
+# ---------------------------------------------------------------- 사이드바: 기본 정보 + 데모 컨트롤
 
 st.sidebar.markdown("### R E A L P A Y")
 st.sidebar.caption("긱워커 통장 입금 -> 세금 예측 -> 자동 적립 AI 에이전트")
-
-screen = st.sidebar.radio(
-    "화면",
-    ["① 온보딩 설문", "② 대시보드", "③ 리포트"],
-    label_visibility="collapsed",
-)
-
 st.sidebar.divider()
-st.sidebar.markdown("**시뮬레이션 대상 긱워커**")
-worker_id = st.sidebar.selectbox(
-    "worker_id",
-    workers_df["worker_id"].tolist(),
-    format_func=lambda x: f"#{x} · {workers_df.loc[workers_df.worker_id == x, 'primary_platform'].values[0]}",
-)
 
+with st.sidebar.expander("🛠 데모/발표용 컨트롤", expanded=False):
+    st.caption("발표 중 로그인 절차 없이 바로 다른 워커 프로필로 전환할 때 사용하세요.")
+    demo_override = st.checkbox("다른 워커로 강제 전환")
+    demo_worker_id = None
+    demo_history_months = None
+    if demo_override:
+        demo_worker_id = st.selectbox(
+            "worker_id",
+            workers_df["worker_id"].tolist(),
+            format_func=lambda x: f"#{x} · {workers_df.loc[workers_df.worker_id == x, 'primary_platform'].values[0]}",
+        )
+        demo_history_months = st.slider("이력 개월수 강제 조정 (콜드스타트 시뮬레이션)", 1, 24, 24)
+
+if st.session_state["logged_in_worker_id"] is not None:
+    st.sidebar.divider()
+    if st.sidebar.button("로그아웃"):
+        st.session_state["logged_in_worker_id"] = None
+        st.session_state["is_new_signup"] = False
+        st.session_state["onboarding_done"] = False
+        st.session_state["onboarding_profile"] = None
+        st.rerun()
+
+
+# ---------------------------------------------------------------- 로그인 화면 (진입점)
+
+if not demo_override and st.session_state["logged_in_worker_id"] is None:
+    st.title("RealPay")
+    st.caption("긱워커 통장 입금을 보고, 세금을 예측해서, 매 입금마다 자동으로 떼어놓는 AI 에이전트")
+    st.divider()
+
+    st.subheader("계좌 조회")
+    with st.form("login"):
+        input_id = st.number_input(
+            "계좌번호",
+            min_value=int(workers_df["worker_id"].min()),
+            max_value=int(workers_df["worker_id"].max()),
+            step=1,
+            value=int(workers_df["worker_id"].min()),
+            help="데모용 계좌번호는 1~400 사이 숫자입니다.",
+        )
+        login_submitted = st.form_submit_button("조회하기")
+
+    if login_submitted:
+        st.session_state["logged_in_worker_id"] = int(input_id)
+        st.session_state["is_new_signup"] = False
+        st.rerun()
+
+    st.divider()
+    st.caption("아직 계좌 이력이 없으신가요?")
+    if st.button("처음 시작하기"):
+        st.session_state["logged_in_worker_id"] = int(workers_df["worker_id"].sample(1, random_state=None).iloc[0])
+        st.session_state["is_new_signup"] = True
+        st.session_state["onboarding_done"] = False
+        st.session_state["onboarding_profile"] = None
+        st.rerun()
+
+    st.stop()
+
+
+# ---------------------------------------------------------------- 로그인 이후 공통 데이터 계산
+
+worker_id = demo_worker_id if demo_override else st.session_state["logged_in_worker_id"]
 worker_row = workers_df[workers_df.worker_id == worker_id].iloc[0]
-history_months = st.sidebar.slider(
-    "지금까지 쌓인 이력(개월) — 콜드스타트 시뮬레이션", 1, 24, 24,
-    help="06. 데이터 계획: 3개월 미만이면 온보딩 설문 기반 추정치를 쓰고, "
-         "3개월 이상 쌓이면 실제 이력 기반 모델 예측으로 전환합니다.",
-)
-
 worker_deposits_full = deposits_df[deposits_df.worker_id == worker_id].sort_values(["year", "month"])
-worker_deposits = worker_deposits_full.iloc[:history_months].copy()
 
+if demo_override:
+    history_months = demo_history_months
+elif st.session_state["is_new_signup"]:
+    # 신규 가입자는 온보딩을 완료해도 실거래 이력이 없으므로 계속 콜드스타트로 취급한다.
+    # (onboarding_done은 "온보딩 화면으로 다시 안 돌아가게" 라우팅에만 쓰고, 여기 조건에는 넣지 않는다)
+    history_months = 1
+else:
+    history_months = len(worker_deposits_full)  # 기존 회원은 실제 이력 길이 그대로
+
+worker_deposits = worker_deposits_full.iloc[:history_months].copy()
 is_cold_start = history_months < 3
 
 
-# ---------------------------------------------------------------- screen 1
+# ---------------------------------------------------------------- 화면 자동 라우팅
 
-if screen == "① 온보딩 설문":
+force_onboarding = is_cold_start and not st.session_state["onboarding_done"] and not demo_override
+
+if force_onboarding:
+    active_screen = "① 온보딩 설문"
+else:
+    active_screen = st.sidebar.radio(
+        "화면", ["② 대시보드", "③ 리포트"], label_visibility="collapsed",
+    )
+
+
+# ---------------------------------------------------------------- screen 1: 온보딩 설문
+
+if active_screen == "① 온보딩 설문":
     st.title("① 온보딩 설문")
     st.caption("가입 직후 3개월치 이력이 없을 때, 초기 프로파일을 만들기 위한 7문항 (06. 콜드스타트 처리)")
 
@@ -123,7 +301,7 @@ if screen == "① 온보딩 설문":
             tax_knowledge = st.select_slider(
                 "7. 세금 지식 수준", options=["전혀 모름", "3.3% 정도만 앎", "종합소득세 신고 경험 있음"]
             )
-        submitted = st.form_submit_button("초기 프로파일 생성")
+        submitted = st.form_submit_button("초기 프로파일 생성하고 대시보드로 이동")
 
     if submitted:
         st.session_state["onboarding_profile"] = {
@@ -135,29 +313,35 @@ if screen == "① 온보딩 설문":
             "expected_monthly": expected_monthly,
             "tax_knowledge": tax_knowledge,
         }
-        st.success("초기 프로파일이 생성되었습니다. ② 대시보드에서 '콜드스타트 이력 개월 수'를 3개월 미만으로 두면 "
-                   "이 설문 기반 추정치가 사용되는 것을 확인할 수 있습니다.")
-
-    if "onboarding_profile" in st.session_state:
-        st.json(st.session_state["onboarding_profile"])
+        st.session_state["onboarding_done"] = True
+        st.success("초기 프로파일이 생성되었습니다. 대시보드로 이동합니다...")
+        st.rerun()
 
 
-# ---------------------------------------------------------------- screen 2
+# ---------------------------------------------------------------- screen 2: 대시보드
 
-elif screen == "② 대시보드":
+elif active_screen == "② 대시보드":
     st.title("② 대시보드")
     st.caption(f"worker #{worker_id} · {worker_row['primary_platform']} · 소득패턴: {worker_row['pattern']}")
 
     if is_cold_start:
         profile = st.session_state.get("onboarding_profile")
         st.warning(
-            "이력이 3개월 미만입니다 → **콜드스타트 모드**: 온보딩 설문 기반 추정치를 사용합니다."
+            "이력이 3개월 미만입니다 → **콜드스타트 모드**: 온보딩 설문 + 유사 워커 데이터 기반 추정치를 사용합니다."
             + ("" if profile else " (① 온보딩 설문을 먼저 작성하면 더 정확한 추정이 반영됩니다)")
         )
         this_month_income = int(worker_deposits.iloc[-1]["monthly_income"]) if len(worker_deposits) else 0
-        predicted_next_month = float(profile["expected_monthly"]) if profile else this_month_income
+        if profile:
+            match = estimate_from_similar_workers(profile, workers_df, deposits_df)
+            predicted_next_month = match["blended_estimate"]
+            st.caption(
+                f"유사 조건 워커 {match['n_matched_workers']}명({match['match_desc']})의 평균 소득 "
+                f"{match['cohort_avg']:,.0f}원과 본인 예상치 {match['self_report']:,.0f}원을 절반씩 반영했습니다."
+            )
+        else:
+            predicted_next_month = this_month_income
         predicted_annual = predicted_next_month * 12
-        reserve_rate_source = "설문 기반 추정"
+        reserve_rate_source = "설문+유사워커 기반 추정"
     else:
         this_month_income = int(worker_deposits.iloc[-1]["monthly_income"])
         feat_table = build_feature_table(worker_deposits)
@@ -172,17 +356,27 @@ elif screen == "② 대시보드":
     tax_result = compute_tax(int(predicted_annual), industry_code)
     reserve_info = compute_deposit_reserve(this_month_income, int(predicted_annual), industry_code)
 
-    # 세금 금고 잔고: 이력 전체에 대해 매달 적립했다고 가정하고 누적
     vault_balance = 0
     for _, row in worker_deposits.iterrows():
         r = compute_deposit_reserve(int(row["monthly_income"]), max(int(predicted_annual), 1), industry_code)
         vault_balance += r["reserve_amount"]
 
-    c1, c2, c3, c4 = st.columns(4)
+    st.markdown(
+        f"""
+        <div style="background: linear-gradient(135deg, #17171A 0%, #2A2A30 100%);
+                    border-radius: 20px; padding: 24px 20px; margin-bottom: 16px; color: white;">
+            <div style="font-size: 0.85rem; color: #B8B8C0; margin-bottom: 6px;">세금 금고 잔고</div>
+            <div style="font-size: 2.1rem; font-weight: 800; color: #FFBC00;">{vault_balance:,}원</div>
+            <div style="font-size: 0.8rem; color: #8A8A93; margin-top: 6px;">이력 전체 매달 자동 적립 시뮬레이션 누적액</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    c1, c2, c3 = st.columns(3)
     c1.metric("이번 달 소득", f"{this_month_income:,}원")
-    c2.metric("이번 입금 적립 필요액", f"{reserve_info['reserve_amount']:,}원", f"{reserve_info['reserve_rate']*100:.1f}%")
-    c3.metric("세금 금고 잔고(누적)", f"{vault_balance:,}원")
-    c4.metric("다음 달 예상 소득", f"{predicted_next_month:,.0f}원", reserve_rate_source)
+    c2.metric("이번 입금 적립액", f"{reserve_info['reserve_amount']:,}원", f"{reserve_info['reserve_rate']*100:.1f}%")
+    c3.metric("다음 달 예상 소득", f"{predicted_next_month:,.0f}원", reserve_rate_source)
 
     st.divider()
     st.subheader("예측 그래프 — 실제 vs 예측")
@@ -208,7 +402,7 @@ elif screen == "② 대시보드":
     st.plotly_chart(fig, use_container_width=True)
 
 
-# ---------------------------------------------------------------- screen 3
+# ---------------------------------------------------------------- screen 3: 리포트
 
 else:
     st.title("③ 리포트")
@@ -218,7 +412,7 @@ else:
     ready = feat_table.dropna(subset=["lag3_income"])
 
     if ready.empty:
-        st.warning("이력이 부족해 리포트를 만들 수 없습니다. 콜드스타트 이력 개월 수를 3개월 이상으로 올려주세요.")
+        st.warning("이력이 부족해 리포트를 만들 수 없습니다. 사이드바 데모 컨트롤에서 이력 개월수를 3개월 이상으로 올려주세요.")
         st.stop()
 
     latest_row = ready.iloc[[-1]]

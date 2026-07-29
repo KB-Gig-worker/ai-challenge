@@ -86,10 +86,12 @@ def main():
 
     baseline_preds = X_test["roll3_mean_income"].values  # naive baseline: 최근 3개월 평균
     baseline_mae = mean_absolute_error(y_test, baseline_preds)
+    baseline_mape = mean_absolute_percentage_error(y_test[mask], baseline_preds[mask]) if mask.any() else float("nan")
 
     # --- 교차검증: MAE가 특정 split에 우연히 좋게/나쁘게 나온 게 아닌지 확인 (worker 단위 5-fold) ---
     gkf = GroupKFold(n_splits=5)
     cv_maes = []
+    cv_mapes = []
     for fold_idx, (tr_idx, te_idx) in enumerate(gkf.split(X, y, groups=groups)):
         X_tr, X_te = X.iloc[tr_idx], X.iloc[te_idx]
         y_tr, y_te = y.iloc[tr_idx], y.iloc[te_idx]
@@ -105,9 +107,14 @@ def main():
         )
         fold_preds = np.clip(fold_model.predict(X_te, num_iteration=fold_model.best_iteration), 0, None)
         cv_maes.append(float(mean_absolute_error(y_te, fold_preds)))
+        fold_mask = y_te > 10_000
+        if fold_mask.any():
+            cv_mapes.append(float(mean_absolute_percentage_error(y_te[fold_mask], fold_preds[fold_mask])))
 
     cv_mae_mean = float(np.mean(cv_maes))
     cv_mae_std = float(np.std(cv_maes))
+    cv_mape_mean = float(np.mean(cv_mapes)) if cv_mapes else float("nan")
+    cv_mape_std = float(np.std(cv_mapes)) if cv_mapes else float("nan")
 
     metrics = {
         "n_train": int(len(X_train)),
@@ -116,11 +123,14 @@ def main():
         "mae": round(float(mae), 0),
         "mape": round(float(mape), 4),
         "baseline_mae_roll3mean": round(float(baseline_mae), 0),
+        "baseline_mape_roll3mean": round(float(baseline_mape), 4),
         "improvement_vs_baseline_pct": round(float(1 - mae / baseline_mae) * 100, 1) if baseline_mae else None,
         "cv_folds": 5,
         "cv_mae_per_fold": [round(v, 0) for v in cv_maes],
         "cv_mae_mean": round(cv_mae_mean, 0),
         "cv_mae_std": round(cv_mae_std, 0),
+        "cv_mape_mean": round(cv_mape_mean, 4),
+        "cv_mape_std": round(cv_mape_std, 4),
         "feature_columns": FEATURE_COLUMNS,
     }
 

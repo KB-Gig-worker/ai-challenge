@@ -3,9 +3,11 @@
 세법 룰 엔진 — 기획안 03. 핵심 구조 / "결정" 단계, 08. 법적 검토 반영.
 
 단순화 가정 (데모용, README에도 명시):
-  - 소득공제는 '기본공제(본인 1인, 150만원)'만 반영. 인적공제/세액공제 등은 생략
-    (기획안 10. 한계 ④ "세액은 예상치 — 인적공제/세액공제 반영 범위 제한"과 일치).
-  - 단순경비율 대상자(직전연도 수입금액 기준 이하)만 다룬다. 기준경비율 대상은 다루지 않음.
+  - 소득공제는 '기본공제(본인 1인, 150만원)'만 반영. 인적공제(부양가족 등)는 생략.
+  - 세액공제는 '표준세액공제(7만원, 소득세법 59조의4)'만 반영. 그 외 특별세액공제는 생략.
+  - 국민연금 등 사회보험료 공제는 개인별 실제 납부액 데이터가 없어 생략
+    (기획안 10. 한계 ④와 일치).
+  - 단순경비율 대상자(직전연도 수입금액 2,400만원 이하)만 다룬다. 기준경비율 대상은 다루지 않음.
   - 지방소득세(소득세의 10%)를 합산해 '실효 결정세액'을 계산한다.
   - 3.3% 원천징수는 '기납부세액'으로 차감한다.
 
@@ -19,6 +21,7 @@ from data.industry_codes import INDUSTRY_CODES, get_candidate_codes
 BASIC_DEDUCTION = 1_500_000  # 본인 기본공제
 WITHHOLDING_RATE = 0.033  # 3.3% 원천징수 (사업소득)
 LOCAL_TAX_RATE = 0.10  # 지방소득세 = 소득세의 10%
+STANDARD_TAX_CREDIT = 70_000  # 표준세액공제(소득세법 59조의4) — 근로소득 없는 사업소득자, 성실신고 대상 아닌 경우
 
 # (하한, 상한, 세율, 누진공제)
 TAX_BRACKETS_2025 = [
@@ -68,6 +71,7 @@ def compute_tax(annual_income: int, industry_code: str) -> TaxResult:
     taxable_income = max(0, annual_income - expense)
     tax_base = max(0, taxable_income - BASIC_DEDUCTION)
     income_tax = progressive_tax(tax_base)
+    income_tax = max(0, income_tax - STANDARD_TAX_CREDIT)  # 표준세액공제 반영
     local_tax = round(income_tax * LOCAL_TAX_RATE)
     total_tax = income_tax + local_tax
     withheld = round(annual_income * WITHHOLDING_RATE)

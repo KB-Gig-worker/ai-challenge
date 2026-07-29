@@ -20,7 +20,7 @@ import pandas as pd
 import xgboost as xgb
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error
 from sklearn.model_selection import GroupKFold
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -102,15 +102,16 @@ def fit_predict_lgb(X_tr, y_tr, X_te):
     return model.predict(X_te, num_iteration=model.best_iteration)
 
 
-def cv_mae(fit_predict_fn, X, y, groups, n_splits=5):
+def cv_scores(fit_predict_fn, X, y, groups, n_splits=5):
     gkf = GroupKFold(n_splits=n_splits)
-    maes = []
+    maes, mapes = [], []
     for tr_idx, te_idx in gkf.split(X, y, groups=groups):
         X_tr, X_te = X.iloc[tr_idx], X.iloc[te_idx]
         y_tr, y_te = y.iloc[tr_idx], y.iloc[te_idx]
         preds = np.clip(fit_predict_fn(X_tr, y_tr, X_te), 0, None)
         maes.append(float(mean_absolute_error(y_te, preds)))
-    return maes
+        mapes.append(float(mean_absolute_percentage_error(y_te, preds)))
+    return maes, mapes
 
 
 def main():
@@ -130,15 +131,17 @@ def main():
     results = {}
     print(f"{'model':16s} {'cv_mae_mean':>14s}   {'cv_mae_std':>12s}")
     for name, fn in models.items():
-        maes = cv_mae(fn, X, y, groups, n_splits=5)
-        mean_mae = float(np.mean(maes))
-        std_mae = float(np.std(maes))
+        maes, mapes = cv_scores(fn, X, y, groups, n_splits=5)
+        mean_mae, std_mae = float(np.mean(maes)), float(np.std(maes))
+        mean_mape, std_mape = float(np.mean(mapes)), float(np.std(mapes))
         results[name] = {
             "cv_mae_per_fold": [round(m, 0) for m in maes],
             "cv_mae_mean": round(mean_mae, 0),
             "cv_mae_std": round(std_mae, 0),
+            "cv_mape_mean": round(mean_mape * 100, 2),  # %
+            "cv_mape_std": round(std_mape * 100, 2),
         }
-        print(f"{name:16s} {mean_mae:>14,.0f} ± {std_mae:>10,.0f}")
+        print(f"{name:16s} MAE {mean_mae:>12,.0f}±{std_mae:>8,.0f}  MAPE {mean_mape*100:>6.2f}%±{std_mape*100:.2f}%")
 
     out_path = ARTIFACT_DIR / "model_comparison.json"
     with open(out_path, "w", encoding="utf-8") as f:
