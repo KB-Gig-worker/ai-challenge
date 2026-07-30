@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from data.industry_codes import list_all_platforms  # noqa: E402
+from data.survey import load_questions, options_for, survey_to_profile  # noqa: E402
 from engine.tax_engine import (  # noqa: E402
     compute_tax,
     compute_deposit_reserve,
@@ -106,36 +107,72 @@ if screen == "① 온보딩 설문":
     st.title("① 온보딩 설문")
     st.caption("가입 직후 3개월치 이력이 없을 때, 초기 프로파일을 만들기 위한 7문항 (06. 콜드스타트 처리)")
 
+    survey = load_questions()
+    q = {item["id"]: item for item in survey["questions"]}
+
+    def _opts(qid):
+        return [(o["value"], o["label"]) for o in q[qid]["options"]]
+
+    def _label_of(qid, val):
+        return next((o["label"] for o in q[qid]["options"] if o["value"] == val), val)
+
+    # q1(직종)은 폼 밖에 두어, 선택에 따라 q4 플랫폼 후보가 즉시 갱신되게 한다.
+    job_opts = _opts("q1_job")
+    job = st.selectbox(
+        f"1. {q['q1_job']['text']}",
+        [v for v, _ in job_opts],
+        format_func=lambda v: dict(job_opts)[v],
+    )
+    platform_choices = options_for("q4_platforms", job)
+
     with st.form("onboarding"):
         col1, col2 = st.columns(2)
         with col1:
-            job = st.text_input("1. 직업(플랫폼 안에서의 역할)", value="배달 라이더")
-            primary_income = st.selectbox("2. 주수입원 플랫폼", list_all_platforms())
-            n_platforms = st.slider("3. 현재 등록한 플랫폼 개수", 1, 5, 1)
-            avg_workdays = st.slider("4. 한 달 평균 근무일수", 0, 31, 20)
-        with col2:
-            pattern_guess = st.radio(
-                "5. 소득이 어떤 편인가요?",
-                ["매달 비슷해요(규칙형)", "성수기/비수기가 뚜렷해요(계절형)", "달마다 들쭉날쭉해요(불규칙형)"],
+            wt_opts = _opts("q2_worktype")
+            work_type = st.radio(
+                f"2. {q['q2_worktype']['text']}",
+                [v for v, _ in wt_opts], format_func=lambda v: dict(wt_opts)[v],
             )
-            expected_monthly = st.number_input("6. 예상 월평균 소득(원)", min_value=0, value=2_000_000, step=100_000)
-            tax_knowledge = st.select_slider(
-                "7. 세금 지식 수준", options=["전혀 모름", "3.3% 정도만 앎", "종합소득세 신고 경험 있음"]
+            pc_opts = _opts("q3_platform_count")
+            platform_count = st.radio(
+                f"3. {q['q3_platform_count']['text']}",
+                [v for v, _ in pc_opts], format_func=lambda v: dict(pc_opts)[v], horizontal=True,
+            )
+            platforms = st.multiselect(
+                f"4. {q['q4_platforms']['text']}", platform_choices,
+                default=platform_choices[:1],
+            )
+        with col2:
+            avg_workdays = st.slider(
+                f"5. {q['q5_workdays']['text']}",
+                q["q5_workdays"]["min"], q["q5_workdays"]["max"], q["q5_workdays"]["default"],
+            )
+            band_opts = _opts("q6_income_band")
+            income_band = st.selectbox(
+                f"6. {q['q6_income_band']['text']}",
+                [v for v, _ in band_opts], index=2, format_func=lambda v: dict(band_opts)[v],
+            )
+            reg_opts = _opts("q7_regularity")
+            regularity = st.radio(
+                f"7. {q['q7_regularity']['text']}",
+                [v for v, _ in reg_opts], format_func=lambda v: dict(reg_opts)[v],
             )
         submitted = st.form_submit_button("초기 프로파일 생성")
 
     if submitted:
-        st.session_state["onboarding_profile"] = {
-            "job": job,
-            "primary_income": primary_income,
-            "n_platforms": n_platforms,
-            "avg_workdays": avg_workdays,
-            "pattern_guess": pattern_guess,
-            "expected_monthly": expected_monthly,
-            "tax_knowledge": tax_knowledge,
+        answers = {
+            "q1_job": job, "q2_worktype": work_type, "q3_platform_count": platform_count,
+            "q4_platforms": platforms, "q5_workdays": avg_workdays,
+            "q6_income_band": income_band, "q7_regularity": regularity,
         }
-        st.success("초기 프로파일이 생성되었습니다. ② 대시보드에서 '콜드스타트 이력 개월 수'를 3개월 미만으로 두면 "
-                   "이 설문 기반 추정치가 사용되는 것을 확인할 수 있습니다.")
+        st.session_state["onboarding_profile"] = survey_to_profile(answers)
+        prof = st.session_state["onboarding_profile"]
+        st.success(
+            "초기 프로파일이 생성되었습니다. ② 대시보드에서 '콜드스타트 이력 개월 수'를 3개월 미만으로 두면 "
+            "이 설문 기반 추정치가 사용됩니다."
+        )
+        if prof["is_target_segment_candidate"]:
+            st.info("이 응답은 RealPay 핵심 타깃(연 2,400~4,800만·다중 플랫폼·주업형)에 해당합니다.")
 
     if "onboarding_profile" in st.session_state:
         st.json(st.session_state["onboarding_profile"])
