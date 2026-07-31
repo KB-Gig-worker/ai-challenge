@@ -1,15 +1,47 @@
 {
-  "n_workers": 400,
-  "n_deposit_rows": 9600,
+  "n_workers": 450,
+  "n_deposit_rows": 10800,
   "pattern_counts": {
-    "regular": 183,
-    "seasonal": 130,
-    "irregular": 87
+    "irregular": 193,
+    "regular": 167,
+    "seasonal": 90
   },
-  "avg_monthly_income": 2036100.0,
+  "avg_monthly_income": 1628100.0,
   "income_range": [
-    55000,
-    5916000
+    0,
+    9000000
   ],
-  "seed": 20260723
+  "seed": 20260723,
+  "gender_counts": {
+    "male": 321,
+    "female": 129
+  },
+  "age_counts": {
+    "30s": 129,
+    "40s": 121,
+    "50s": 91,
+    "20s": 62,
+    "60s": 45,
+    "10s": 2
+  },
+  "worktype_counts": {
+    "primary": 250,
+    "occasional": 102,
+    "secondary": 98
+  },
+  "job_counts": {
+    "운송·배달·대리": 247,
+    "전문서비스": 73,
+    "컴퓨터 단순작업": 45,
+    "가사·청소·돌봄": 27,
+    "창작활동": 25,
+    "IT 서비스": 21,
+    "기타": 12
+  },
+  "platform_count_dist": {
+    "1": 240,
+    "2": 159,
+    "3": 51
+  },
+  "target_segment_n": 65
 }
