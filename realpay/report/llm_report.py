@@ -22,6 +22,7 @@ def build_insight_context(
     top_shap_factors: list,
     tax_result,
     recommendation: dict,
+    stability=None,
 ) -> dict:
     """모델/엔진 출력들을 리포트 생성에 필요한 하나의 컨텍스트로 모은다."""
     pct_vs_3m = 0.0
@@ -43,6 +44,10 @@ def build_insight_context(
         "max_savings_vs_worst": int(recommendation["max_savings_vs_worst"]),
         "estimated_total_tax": int(tax_result.total_tax),
         "additional_payment": int(tax_result.additional_payment),
+        "stability_grade": stability.grade if stability else None,
+        "stability_cv6": stability.cv6 if stability else None,
+        "stability_trend_pct": stability.trend_pct if stability else None,
+        "stability_n_platforms": stability.n_platforms if stability else None,
     }
 
 
@@ -92,6 +97,14 @@ def render_template_report(ctx: dict) -> str:
             f"환급이 예상됩니다."
         )
 
+    if ctx.get("stability_grade"):
+        lines.append(
+            f"소득 안정성 수준은 '{ctx['stability_grade']}'입니다 "
+            f"(최근 6개월 변동계수 {ctx['stability_cv6']}, "
+            f"3개월 추세 {ctx['stability_trend_pct']:+.1f}%, "
+            f"활성 플랫폼 {ctx['stability_n_platforms']}개 기준)."
+        )
+
     return " ".join(lines)
 
 
@@ -113,9 +126,14 @@ def _generate_via_claude(ctx: dict, api_key: str) -> str:
     client = anthropic.Anthropic(api_key=api_key)
     system = (
         "너는 긱워커를 위한 세금 절약 어시스턴트 RealPay의 리포트 작성기다. "
-        "아래 JSON 데이터만 근거로, 과장 없이 담백한 한국어 3~5문장 리포트를 써라. "
-        "숫자는 반드시 입력값 그대로 사용하고, '신용점수'라는 단어는 쓰지 말고, "
-        "세액은 항상 '예상치'라고 표현해라."
+        "아래 JSON 데이터만 근거로, 과장 없이 담백한 한국어 리포트를 다음 4단계 구조로 써라: "
+        "1) 한 줄 진단(안정성 요약과 가장 큰 리스크), "
+        "2) 이번 달 소득(3개월 평균 대비 %와 추세), "
+        "3) 세금 대비(예상 연소득, 예상 종소세, 적립 필요액, 2,400만원 기준선 임박 여부), "
+        "4) 리스크와 행동 제안(비수기 대비, 플랫폼 분산 등). "
+        "숫자는 반드시 입력값 그대로 사용해라. '신용점수', '신용등급', '등급'이라는 단어는 쓰지 말고 "
+        "'안정성 수준'이라고 표현해라. 세액은 항상 '예상치'라고 표현하고, "
+        "이 리포트는 본인 확인용 자가진단임을 벗어나는 해석(대출 가능성, 타인과의 비교 백분위 등)은 하지 마라."
     )
     message = client.messages.create(
         model="claude-sonnet-5",

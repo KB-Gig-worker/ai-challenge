@@ -32,6 +32,7 @@ from engine.tax_engine import (  # noqa: E402
     recommend_industry_code,
     SIMPLE_EXPENSE_RATE_CAP_INCOME,
 )
+from engine.stability import assess_stability
 from model.features import build_feature_table  # noqa: E402
 from model.predict import IncomePredictor  # noqa: E402
 from report.llm_report import build_insight_context, generate_llm_report  # noqa: E402
@@ -468,6 +469,34 @@ else:
     st.plotly_chart(fig2, use_container_width=True)
 
     st.divider()
+    st.subheader("소득 안정성 자가진단")
+    st.caption("내 소득 상태를 스스로 확인하는 정량 지표입니다 (신용평가가 아닙니다)")
+
+    try:
+        stab = assess_stability(worker_deposits)
+        grade_color = {"안정": "#0F6B60", "보통": "#B8860B", "불안정": "#A8382A"}[stab.grade]
+        st.markdown(
+            f"""
+            <div style="display:inline-block; background:{grade_color}; color:white;
+                        border-radius:12px; padding:6px 18px; font-weight:800; font-size:1.1rem;
+                        margin-bottom:10px;">
+                안정성 수준: {stab.grade}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        s1, s2, s3, s4 = st.columns(4)
+        s1.metric("변동계수(6개월)", f"{stab.cv6:.2f}")
+        s2.metric("소득 추세", f"{stab.trend_pct:+.1f}%")
+        s3.metric("계절성 진폭", f"{stab.seasonal_amplitude:.0f}%")
+        s4.metric("활성 플랫폼", f"{stab.n_platforms}개")
+        for reason in stab.grade_reasons:
+            st.caption(f"· {reason}")
+    except ValueError:
+        stab = None
+        st.info("이력이 6개월 미만이라 안정성 자가진단을 건너뜁니다.")
+
+    st.divider()
     st.subheader("LLM 요약")
 
     ctx = build_insight_context(
@@ -478,6 +507,7 @@ else:
         top_shap_factors=factors,
         tax_result=tax_result,
         recommendation=rec,
+        stability=stab,
     )
     report_text, source = generate_llm_report(ctx)
     st.markdown(f"> {report_text}")
