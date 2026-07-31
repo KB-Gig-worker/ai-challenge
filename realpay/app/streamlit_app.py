@@ -225,23 +225,25 @@ if not demo_override and st.session_state["logged_in_worker_id"] is None:
     with st.form("login"):
         input_id = st.number_input(
             "계좌번호",
-            min_value=int(workers_df["worker_id"].min()),
-            max_value=int(workers_df["worker_id"].max()),
+            min_value=1,
             step=1,
-            value=int(workers_df["worker_id"].min()),
+            value=1,
             help="데모용 계좌번호는 1~450 사이 숫자입니다.",
         )
         login_submitted = st.form_submit_button("조회하기")
 
     if login_submitted:
-        st.session_state["logged_in_worker_id"] = int(input_id)
-        st.session_state["is_new_signup"] = False
-        st.rerun()
+        if int(input_id) in workers_df["worker_id"].values:
+            st.session_state["logged_in_worker_id"] = int(input_id)
+            st.session_state["is_new_signup"] = False
+            st.rerun()
+        else:
+            st.error("존재하지 않는 계좌번호입니다. 처음 이용하시는 경우 아래 '처음 시작하기'를 눌러주세요.")
 
     st.divider()
     st.caption("아직 계좌 이력이 없으신가요?")
     if st.button("처음 시작하기"):
-        st.session_state["logged_in_worker_id"] = int(workers_df["worker_id"].sample(1, random_state=None).iloc[0])
+        st.session_state["logged_in_worker_id"] = int(workers_df["worker_id"].max()) + 1
         st.session_state["is_new_signup"] = True
         st.session_state["onboarding_done"] = False
         st.session_state["onboarding_profile"] = None
@@ -253,8 +255,20 @@ if not demo_override and st.session_state["logged_in_worker_id"] is None:
 # ---------------------------------------------------------------- 로그인 이후 공통 데이터 계산
 
 worker_id = demo_worker_id if demo_override else st.session_state["logged_in_worker_id"]
-worker_row = workers_df[workers_df.worker_id == worker_id].iloc[0]
-worker_deposits_full = deposits_df[deposits_df.worker_id == worker_id].sort_values(["year", "month"])
+is_known_worker = worker_id in workers_df["worker_id"].values
+
+if is_known_worker:
+    worker_row = workers_df[workers_df.worker_id == worker_id].iloc[0]
+    worker_deposits_full = deposits_df[deposits_df.worker_id == worker_id].sort_values(["year", "month"])
+else:
+    # 신규 가입자: mock 데이터에 없는 새 계좌 — 실거래 이력 없음, 설문 프로파일로 표시
+    _profile = st.session_state.get("onboarding_profile") or {}
+    worker_row = pd.Series({
+        "worker_id": worker_id,
+        "pattern": _profile.get("pattern", "미정"),
+        "primary_platform": _profile.get("primary_platform", "미정"),
+    })
+    worker_deposits_full = pd.DataFrame(columns=deposits_df.columns)
 
 if demo_override:
     history_months = demo_history_months
@@ -346,9 +360,9 @@ if active_screen == "① 온보딩 설문":
             "q6_income_band": income_band, "q7_regularity": regularity,
         }
         st.session_state["onboarding_profile"] = survey_to_profile(answers)
-                st.session_state["onboarding_done"] = True
-                st.success("초기 프로파일이 생성되었습니다. 대시보드로 이동합니다...")
-                st.rerun()
+        st.session_state["onboarding_done"] = True
+        st.success("초기 프로파일이 생성되었습니다. 대시보드로 이동합니다...")
+        st.rerun()
 
 
 # ---------------------------------------------------------------- screen 2: 대시보드
@@ -363,7 +377,7 @@ elif active_screen == "② 대시보드":
             "이력이 3개월 미만입니다 → **콜드스타트 모드**: 온보딩 설문 + 유사 워커 데이터 기반 추정치를 사용합니다."
             + ("" if profile else " (① 온보딩 설문을 먼저 작성하면 더 정확한 추정이 반영됩니다)")
         )
-        this_month_income = int(worker_deposits.iloc[-1]["monthly_income"]) if len(worker_deposits) else 0
+        this_month_income = int(worker_deposits.iloc[-1]["monthly_income"]) if len(worker_deposits) else None
         if profile:
             match = estimate_from_similar_workers(profile, workers_df, deposits_df)
             predicted_next_month = match["blended_estimate"]
@@ -374,7 +388,7 @@ elif active_screen == "② 대시보드":
             if profile.get("is_target_segment_candidate"):
                 st.caption("✓ 이 프로파일은 RealPay 핵심 타깃(연 2,400~4,800만·다중 플랫폼·주업형)에 해당합니다.")
         else:
-            predicted_next_month = this_month_income
+            predicted_next_month = this_month_income or 0
         predicted_annual = predicted_next_month * 12
         reserve_rate_source = "설문+유사워커 기반 추정"
     else:
@@ -389,7 +403,7 @@ elif active_screen == "② 대시보드":
     industry_code = rec["recommended"].industry_code
 
     tax_result = compute_tax(int(predicted_annual), industry_code)
-    reserve_info = compute_deposit_reserve(this_month_income, int(predicted_annual), industry_code)
+    reserve_info = compute_deposit_reserve(this_month_income or 0, int(predicted_annual), industry_code)
 
     vault_balance = 0
     for _, row in worker_deposits.iterrows():
@@ -409,8 +423,12 @@ elif active_screen == "② 대시보드":
     )
 
     c1, c2, c3 = st.columns(3)
-    c1.metric("이번 달 소득", f"{this_month_income:,}원")
-    c2.metric("이번 입금 적립액", f"{reserve_info['reserve_amount']:,}원", f"{reserve_info['reserve_rate']*100:.1f}%")
+    c1.metric("이번 달 소득", f"{this_month_income:,}원" if this_month_income is not None else "이력 없음")
+    c2.metric(
+        "이번 입금 적립액",
+        f"{reserve_info['reserve_amount']:,}원" if this_month_income is not None else "첫 입금 후 시작",
+        f"{reserve_info['reserve_rate']*100:.1f}%" if this_month_income is not None else None,
+    )
     c3.metric("다음 달 예상 소득", f"{predicted_next_month:,.0f}원", reserve_rate_source)
 
     st.divider()
@@ -443,6 +461,11 @@ else:
     st.title("③ 리포트")
     st.caption(f"worker #{worker_id} · {worker_row['primary_platform']}")
 
+    if worker_deposits.empty:
+        st.warning("아직 실거래 이력이 없습니다. 리포트는 입금 이력이 쌓이면 제공됩니다. "
+                   "그전까지는 ② 대시보드에서 설문 기반 추정치를 확인하세요.")
+        st.stop()
+
     feat_table = build_feature_table(worker_deposits)
     ready = feat_table.dropna(subset=["lag3_income"])
 
@@ -467,9 +490,12 @@ else:
         "5월 추가 납부 예상" if tax_result.additional_payment >= 0 else "5월 환급 예상",
         f"{abs(tax_result.additional_payment):,}원",
     )
+    method_note = ""
+    if tax_result.expense_method == "기준경비율":
+        method_note = " (기준수입금액 초과로 기준경비율 적용 — 주요경비 증빙 미반영 보수적 추정)"
     st.caption(
-        f"※ 예상치이며 단순경비율({tax_result.expense_rate*100:.1f}%) 및 기본공제만 반영한 근사치입니다. "
-        f"단순경비율 유지 기준선: {SIMPLE_EXPENSE_RATE_CAP_INCOME:,}원"
+        f"※ 예상치이며 {tax_result.expense_method}({tax_result.expense_rate*100:.1f}%) 및 기본공제만 반영한 근사치입니다."
+        f"{method_note} 기준수입금액: {SIMPLE_EXPENSE_RATE_CAP_INCOME:,}원"
     )
 
     st.divider()
@@ -481,7 +507,7 @@ else:
         rows.append({
             "업종코드": r.industry_code,
             "업종명": r.industry_name,
-            "단순경비율": f"{r.expense_rate*100:.1f}%",
+            "적용 경비율": f"{r.expense_rate*100:.1f}%",
             "예상 총세액": f"{r.total_tax:,}원",
             "추천": "⭐ 최적" if r.industry_code == rec["recommended"].industry_code else "",
         })
@@ -549,8 +575,8 @@ else:
 
     st.divider()
     st.subheader("모델 비교 — 왜 LightGBM인가")
-    st.caption("5-fold 교차검증(worker 단위)으로 4개 모델을 공정 비교한 결과입니다. "
-               "실제 예측/적립액 계산에는 LightGBM만 사용됩니다.")
+    st.caption("5-fold 교차검증(worker 단위) 결과 트리 기반 3개 모델은 오차범위 내 동급 — "
+               "성능이 같다면 SHAP 설명가능성과 속도가 앞서는 LightGBM을 채택했습니다.")
 
     comparison_path = ROOT / "model" / "artifacts" / "model_comparison.json"
     if comparison_path.exists():

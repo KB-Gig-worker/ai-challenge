@@ -110,7 +110,9 @@ def cv_scores(fit_predict_fn, X, y, groups, n_splits=5):
         y_tr, y_te = y.iloc[tr_idx], y.iloc[te_idx]
         preds = np.clip(fit_predict_fn(X_tr, y_tr, X_te), 0, None)
         maes.append(float(mean_absolute_error(y_te, preds)))
-        mapes.append(float(mean_absolute_percentage_error(y_te, preds)))
+        mask = y_te > 10_000  # MAPE는 0 근처 실제값에서 폭주하므로 제외
+        if mask.any():
+            mapes.append(float(mean_absolute_percentage_error(y_te[mask], preds[mask])))
     return maes, mapes
 
 

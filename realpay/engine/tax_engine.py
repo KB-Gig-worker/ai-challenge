@@ -52,6 +52,7 @@ class TaxResult:
     total_tax: int  # 총 결정세액(소득세+지방세)
     withheld_tax: int  # 기납부(원천징수 3.3%) 추정액
     additional_payment: int  # 5월에 추가로 낼 것으로 예상되는 금액 (총세액 - 기납부, 음수면 환급)
+    expense_method: str = "단순경비율"  # 적용된 경비율 방식
 
 
 def progressive_tax(tax_base: int) -> int:
@@ -65,9 +66,18 @@ def progressive_tax(tax_base: int) -> int:
 
 
 def compute_tax(annual_income: int, industry_code: str) -> TaxResult:
-    """연간 수입금액과 업종코드로 종합소득세 예상액을 계산한다 (단순경비율 방식)."""
+    """연간 수입금액과 업종코드로 종합소득세 예상액을 계산한다.
+    기준수입금액(2,400만원) 이하면 단순경비율, 초과하면 기준경비율 적용.
+    (기준경비율 방식은 원래 '주요경비 증빙'을 별도 차감하지만, 증빙 데이터가 없어
+    경비율만 적용한 보수적(세금이 많게 나오는 쪽) 추정치다.)"""
     info = INDUSTRY_CODES[industry_code]
-    expense = round(annual_income * info.simple_expense_rate)
+    if annual_income <= SIMPLE_EXPENSE_RATE_CAP_INCOME:
+        applied_rate = info.simple_expense_rate
+        method = "단순경비율"
+    else:
+        applied_rate = info.standard_expense_rate
+        method = "기준경비율"
+    expense = round(annual_income * applied_rate)
     taxable_income = max(0, annual_income - expense)
     tax_base = max(0, taxable_income - BASIC_DEDUCTION)
     income_tax = progressive_tax(tax_base)
@@ -81,7 +91,7 @@ def compute_tax(annual_income: int, industry_code: str) -> TaxResult:
         industry_code=industry_code,
         industry_name=info.name,
         annual_income=annual_income,
-        expense_rate=info.simple_expense_rate,
+        expense_rate=applied_rate,
         necessary_expense=expense,
         taxable_income=taxable_income,
         tax_base=tax_base,
@@ -90,6 +100,7 @@ def compute_tax(annual_income: int, industry_code: str) -> TaxResult:
         total_tax=total_tax,
         withheld_tax=withheld,
         additional_payment=additional,
+        expense_method=method,
     )
 
 
