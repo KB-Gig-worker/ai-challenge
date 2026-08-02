@@ -39,9 +39,8 @@ def build_insight_context(
         "predicted_annual_income": int(predicted_annual_income),
         "under_simple_expense_cap": under_cap,
         "top_shap_factors": top_shap_factors,
-        "recommended_code": recommendation["recommended"].industry_code,
-        "recommended_name": recommendation["recommended"].industry_name,
-        "max_savings_vs_worst": int(recommendation["max_savings_vs_worst"]),
+        "representative_code": recommendation["representative"].industry_code,
+        "representative_name": recommendation["representative"].industry_name,
         "estimated_total_tax": int(tax_result.total_tax),
         "additional_payment": int(tax_result.additional_payment),
         "stability_grade": stability.grade if stability else None,
@@ -62,12 +61,12 @@ def render_template_report(ctx: dict) -> str:
 
     if ctx["under_simple_expense_cap"]:
         lines.append(
-            f"연간 예상 소득이 {ctx['predicted_annual_income']:,}원으로, "
+            f"다음 달 추정치의 단순 연환산 값이 {ctx['predicted_annual_income']:,}원으로, "
             f"기준선 {SIMPLE_EXPENSE_RATE_CAP_INCOME:,}원 아래라 단순경비율 대상이 유지됩니다."
         )
     else:
         lines.append(
-            f"연간 예상 소득이 {ctx['predicted_annual_income']:,}원으로, "
+            f"다음 달 추정치의 단순 연환산 값이 {ctx['predicted_annual_income']:,}원으로, "
             f"기준선 {SIMPLE_EXPENSE_RATE_CAP_INCOME:,}원을 넘어설 것으로 보여 "
             f"단순경비율 유지 여부를 확인해야 합니다."
         )
@@ -80,16 +79,10 @@ def render_template_report(ctx: dict) -> str:
             f"방향으로 약 {abs(f0['pct_of_prediction'])}% 작용했습니다."
         )
 
-    if ctx["max_savings_vs_worst"] > 0:
-        lines.append(
-            f"업종코드를 '{ctx['recommended_name']}'({ctx['recommended_code']})로 신고하면 "
-            f"다른 후보 대비 최대 {ctx['max_savings_vs_worst']:,}원까지 세금을 줄일 수 있습니다."
-        )
-
     if ctx["additional_payment"] > 0:
         lines.append(
             f"지금까지의 3.3% 원천징수만으로는 부족해, 5월에 약 {ctx['additional_payment']:,}원을 "
-            f"추가로 낼 것으로 예상됩니다. 매 입금 시 자동 적립을 켜두면 한 번에 목돈으로 나가는 부담을 줄일 수 있습니다."
+            f"추가로 낼 가능성이 있습니다. 원천징수 내역과 공제자료를 확인한 뒤 대비 금액을 조정하세요."
         )
     else:
         lines.append(
@@ -108,7 +101,7 @@ def render_template_report(ctx: dict) -> str:
     return " ".join(lines)
 
 
-def generate_llm_report(ctx: dict, prefer_api: bool = True) -> tuple:
+def generate_llm_report(ctx: dict, prefer_api: bool = False) -> tuple:
     """(리포트 텍스트, 생성 방식) 튜플을 반환한다. 방식은 'claude-api' 또는 'template'."""
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if prefer_api and api_key:
@@ -125,14 +118,15 @@ def _generate_via_claude(ctx: dict, api_key: str) -> str:
 
     client = anthropic.Anthropic(api_key=api_key)
     system = (
-        "너는 긱워커를 위한 세금 절약 어시스턴트 RealPay의 리포트 작성기다. "
+        "너는 긱워커를 위한 세금 대비 참고정보 도구 RealPay의 리포트 작성기다. "
         "아래 JSON 데이터만 근거로, 과장 없이 담백한 한국어 리포트를 다음 4단계 구조로 써라: "
         "1) 한 줄 진단(안정성 요약과 가장 큰 리스크), "
         "2) 이번 달 소득(3개월 평균 대비 %와 추세), "
-        "3) 세금 대비(예상 연소득, 예상 종소세, 적립 필요액, 2,400만원 기준선 임박 여부), "
+        "3) 세금 대비(단순 연환산 값, 참고 세액 추정치, 추가 납부 대비 참고액, 데모 기준선 여부), "
         "4) 리스크와 행동 제안(비수기 대비, 플랫폼 분산 등). "
         "숫자는 반드시 입력값 그대로 사용해라. '신용점수', '신용등급', '등급'이라는 단어는 쓰지 말고 "
-        "'안정성 수준'이라고 표현해라. 세액은 항상 '예상치'라고 표현하고, "
+        "'안정성 수준'이라고 표현해라. 세액은 항상 '참고 추정치'라고 표현하고, "
+        "업종코드를 신고용으로 추천하거나 절세 효과를 주장하지 마라. "
         "이 리포트는 본인 확인용 자가진단임을 벗어나는 해석(대출 가능성, 타인과의 비교 백분위 등)은 하지 마라."
     )
     message = client.messages.create(

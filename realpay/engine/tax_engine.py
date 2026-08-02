@@ -7,7 +7,8 @@
   - 세액공제는 '표준세액공제(7만원, 소득세법 59조의4)'만 반영. 그 외 특별세액공제는 생략.
   - 국민연금 등 사회보험료 공제는 개인별 실제 납부액 데이터가 없어 생략
     (기획안 10. 한계 ④와 일치).
-  - 단순경비율 대상자(직전연도 수입금액 2,400만원 이하)만 다룬다. 기준경비율 대상은 다루지 않음.
+  - 단순/기준경비율 판정은 데모용 2,400만원 단일 기준을 사용한다. 실제 판정은 업종,
+    귀속연도, 직전연도 수입 및 신규사업자 여부 등에 따라 달라질 수 있다.
   - 지방소득세(소득세의 10%)를 합산해 '실효 결정세액'을 계산한다.
   - 3.3% 원천징수는 '기납부세액'으로 차감한다.
 
@@ -105,23 +106,22 @@ def compute_tax(annual_income: int, industry_code: str) -> TaxResult:
 
 
 def effective_reserve_rate(annual_income: int, industry_code: str) -> float:
-    """이 예상 연소득 기준 '입금액 대비 몇 %를 떼어놔야 하는가' 실효 적립률.
+    """예상 연소득 기준 추가 납부 대비율.
 
-    3.3% 원천징수만으로 부족한 부분(= 5월에 추가로 낼 돈)을
-    연간 수입금액 대비 비율로 환산한다. 04. MVP 범위 '세금 적립액 산출'.
+    지급자가 3.3%를 이미 원천징수해 납부했다는 가정 아래, 예상 추가 납부액만
+    연간 수입금액 대비 비율로 환산한다. 원천징수액을 다시 적립하지 않는다.
     """
     if annual_income <= 0:
-        return WITHHOLDING_RATE
+        return 0.0
     result = compute_tax(annual_income, industry_code)
     shortfall = max(0, result.additional_payment)
-    extra_rate = shortfall / annual_income
-    return WITHHOLDING_RATE + extra_rate
+    return shortfall / annual_income
 
 
 def compute_deposit_reserve(deposit_amount: int, predicted_annual_income: int, industry_code: str) -> dict:
-    """입금 1건이 들어왔을 때, 이번 건에서 세금 금고로 떼어놓을 금액을 산출한다.
+    """소득액을 기준으로 추가 납부에 대비할 참고 금액을 산출한다.
 
-    05. 핵심 구조 '실행' 단계에 대응. 실제 이체는 시뮬레이션(기획안 04. 제외 항목).
+    실제 계좌 조회, 자금 보관 또는 이체는 수행하지 않는다.
     """
     rate = effective_reserve_rate(predicted_annual_income, industry_code)
     reserve = round(deposit_amount * rate)
@@ -141,16 +141,17 @@ def compare_industry_codes(annual_income: int, candidate_codes: list) -> list:
     return results
 
 
-def recommend_industry_code(annual_income: int, platform: str) -> dict:
-    """플랫폼명 -> 후보 코드 산출 -> 세액 비교 -> 최적 코드 추천."""
+def get_industry_code_candidates(annual_income: int, platform: str) -> dict:
+    """플랫폼에 연결된 검토 후보를 반환한다.
+
+    첫 후보는 플랫폼 매핑상 대표 후보일 뿐, 세액이 가장 낮다는 이유로 선택하지 않는다.
+    실제 신고 코드는 수행한 용역의 사실관계로 확인해야 한다.
+    """
     candidates = get_candidate_codes(platform)
-    ranked = compare_industry_codes(annual_income, candidates)
-    best = ranked[0]
-    worst = ranked[-1]
-    savings = worst.total_tax - best.total_tax
+    results = [compute_tax(annual_income, code) for code in candidates]
+    representative = results[0]
     return {
         "platform": platform,
-        "candidates": ranked,
-        "recommended": best,
-        "max_savings_vs_worst": savings,
+        "candidates": results,
+        "representative": representative,
     }

@@ -30,7 +30,7 @@ from data.survey import load_questions, options_for, survey_to_profile  # noqa: 
 from engine.tax_engine import (  # noqa: E402
     compute_tax,
     compute_deposit_reserve,
-    recommend_industry_code,
+    get_industry_code_candidates,
     SIMPLE_EXPENSE_RATE_CAP_INCOME,
 )
 from engine.stability import assess_stability
@@ -188,7 +188,8 @@ for key, default in [
 # ---------------------------------------------------------------- 사이드바: 기본 정보 + 데모 컨트롤
 
 st.sidebar.markdown("### R E A L P A Y")
-st.sidebar.caption("긱워커 통장 입금 -> 세금 예측 -> 자동 적립 AI 에이전트")
+st.sidebar.caption("가상 소득 데이터로 세금 대비 금액을 살펴보는 데모")
+st.sidebar.warning("가상 데이터 · 실제 계좌 연결/조회/이체 없음")
 st.sidebar.divider()
 
 with st.sidebar.expander("🛠 데모/발표용 컨트롤", expanded=False):
@@ -218,17 +219,18 @@ if st.session_state["logged_in_worker_id"] is not None:
 
 if not demo_override and st.session_state["logged_in_worker_id"] is None:
     st.title("RealPay")
-    st.caption("긱워커 통장 입금을 보고, 세금을 예측해서, 매 입금마다 자동으로 떼어놓는 AI 에이전트")
+    st.caption("가상 소득 내역으로 다음 달 소득과 세금 대비 금액을 추정하는 개념검증 데모")
+    st.info("실제 계좌를 조회하거나 돈을 이체·보관하지 않으며, 세무 신고나 세무 자문을 제공하지 않습니다.")
     st.divider()
 
-    st.subheader("계좌 조회")
+    st.subheader("데모 프로필 선택")
     with st.form("login"):
         input_id = st.number_input(
-            "계좌번호",
+            "데모 프로필 번호",
             min_value=1,
             step=1,
             value=1,
-            help="데모용 계좌번호는 1~450 사이 숫자입니다.",
+            help="가상 데이터 프로필은 1~450 사이 숫자입니다. 실제 계좌번호가 아닙니다.",
         )
         login_submitted = st.form_submit_button("조회하기")
 
@@ -238,10 +240,10 @@ if not demo_override and st.session_state["logged_in_worker_id"] is None:
             st.session_state["is_new_signup"] = False
             st.rerun()
         else:
-            st.error("존재하지 않는 계좌번호입니다. 처음 이용하시는 경우 아래 '처음 시작하기'를 눌러주세요.")
+            st.error("존재하지 않는 데모 프로필입니다. 새 가상 프로필은 아래 '처음 시작하기'를 눌러주세요.")
 
     st.divider()
-    st.caption("아직 계좌 이력이 없으신가요?")
+    st.caption("가상 소득 이력이 없는 새 프로필을 체험하시겠어요?")
     if st.button("처음 시작하기"):
         st.session_state["logged_in_worker_id"] = int(workers_df["worker_id"].max()) + 1
         st.session_state["is_new_signup"] = True
@@ -399,8 +401,8 @@ elif active_screen == "② 대시보드":
         predicted_annual = predictor.predict_annual(latest_row)
         reserve_rate_source = "LightGBM 모델 예측"
 
-    rec = recommend_industry_code(int(predicted_annual), worker_row["primary_platform"])
-    industry_code = rec["recommended"].industry_code
+    rec = get_industry_code_candidates(int(predicted_annual), worker_row["primary_platform"])
+    industry_code = rec["representative"].industry_code
 
     tax_result = compute_tax(int(predicted_annual), industry_code)
     reserve_info = compute_deposit_reserve(this_month_income or 0, int(predicted_annual), industry_code)
@@ -414,9 +416,9 @@ elif active_screen == "② 대시보드":
         f"""
         <div style="background: linear-gradient(135deg, #17171A 0%, #2A2A30 100%);
                     border-radius: 20px; padding: 24px 20px; margin-bottom: 16px; color: white;">
-            <div style="font-size: 0.85rem; color: #B8B8C0; margin-bottom: 6px;">세금 금고 잔고</div>
+            <div style="font-size: 0.85rem; color: #B8B8C0; margin-bottom: 6px;">가상 추가납부 대비 누적액</div>
             <div style="font-size: 2.1rem; font-weight: 800; color: #FFBC00;">{vault_balance:,}원</div>
-            <div style="font-size: 0.8rem; color: #8A8A93; margin-top: 6px;">이력 전체 매달 자동 적립 시뮬레이션 누적액</div>
+            <div style="font-size: 0.8rem; color: #8A8A93; margin-top: 6px;">3.3% 원천징수 완료 가정 · 실제 보관/이체 없음</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -425,11 +427,12 @@ elif active_screen == "② 대시보드":
     c1, c2, c3 = st.columns(3)
     c1.metric("이번 달 소득", f"{this_month_income:,}원" if this_month_income is not None else "이력 없음")
     c2.metric(
-        "이번 입금 적립액",
+        "이번 달 추가 대비 참고액",
         f"{reserve_info['reserve_amount']:,}원" if this_month_income is not None else "첫 입금 후 시작",
         f"{reserve_info['reserve_rate']*100:.1f}%" if this_month_income is not None else None,
     )
-    c3.metric("다음 달 예상 소득", f"{predicted_next_month:,.0f}원", reserve_rate_source)
+    c3.metric("다음 달 소득 추정치", f"{predicted_next_month:,.0f}원", reserve_rate_source)
+    st.caption("소득·세액은 목데이터와 단순화된 가정에 따른 점추정치입니다. 실제 결과는 크게 달라질 수 있습니다.")
 
     st.divider()
     st.subheader("예측 그래프 — 실제 vs 예측")
@@ -479,28 +482,30 @@ else:
     predicted_annual = predictor.predict_annual(latest_row)
     explanation = predictor.explain(latest_row)
 
-    rec = recommend_industry_code(int(predicted_annual), worker_row["primary_platform"])
-    tax_result = compute_tax(int(predicted_annual), rec["recommended"].industry_code)
+    rec = get_industry_code_candidates(int(predicted_annual), worker_row["primary_platform"])
+    tax_result = compute_tax(int(predicted_annual), rec["representative"].industry_code)
 
-    st.subheader("연간 예상 세액")
+    st.subheader("연환산 세액 참고 추정")
     c1, c2, c3 = st.columns(3)
-    c1.metric("연간 예상 소득", f"{predicted_annual:,.0f}원")
-    c2.metric("예상 총 결정세액(소득세+지방세)", f"{tax_result.total_tax:,}원")
+    c1.metric("다음 달 추정치 × 12", f"{predicted_annual:,.0f}원")
+    c2.metric("참고 세액 추정치", f"{tax_result.total_tax:,}원")
     c3.metric(
-        "5월 추가 납부 예상" if tax_result.additional_payment >= 0 else "5월 환급 예상",
+        "추가 납부 참고액" if tax_result.additional_payment >= 0 else "환급 가능 참고액",
         f"{abs(tax_result.additional_payment):,}원",
     )
     method_note = ""
     if tax_result.expense_method == "기준경비율":
         method_note = " (기준수입금액 초과로 기준경비율 적용 — 주요경비 증빙 미반영 보수적 추정)"
     st.caption(
-        f"※ 예상치이며 {tax_result.expense_method}({tax_result.expense_rate*100:.1f}%) 및 기본공제만 반영한 근사치입니다."
-        f"{method_note} 기준수입금액: {SIMPLE_EXPENSE_RATE_CAP_INCOME:,}원"
+        f"※ 목데이터 기반 참고 추정치입니다. 다음 달 추정치를 12배했으며, {tax_result.expense_method}"
+        f"({tax_result.expense_rate*100:.1f}%) 및 기본공제만 반영했습니다.{method_note} "
+        f"데모 기준수입금액: {SIMPLE_EXPENSE_RATE_CAP_INCOME:,}원. 실제 판정·세액은 업종, 귀속연도, "
+        "직전연도 수입, 다른 소득과 공제에 따라 달라지므로 홈택스 자료 또는 세무전문가에게 확인하세요."
     )
 
     st.divider()
-    st.subheader("업종코드 추천")
-    st.caption("같은 소득이라도 업종코드에 따라 세액이 달라집니다 (01. 문제 ① 국정감사 실사례와 동일한 로직).")
+    st.subheader("업종코드 검토 후보")
+    st.caption("플랫폼명으로 좁힌 참고 후보입니다. 실제 신고 코드는 세액이 아니라 수행한 업무의 사실관계로 결정해야 합니다.")
 
     rows = []
     for r in rec["candidates"]:
@@ -509,14 +514,14 @@ else:
             "업종명": r.industry_name,
             "적용 경비율": f"{r.expense_rate*100:.1f}%",
             "예상 총세액": f"{r.total_tax:,}원",
-            "추천": "⭐ 최적" if r.industry_code == rec["recommended"].industry_code else "",
+            "구분": "플랫폼 대표 후보" if r.industry_code == rec["representative"].industry_code else "추가 확인 후보",
         })
     st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-    if rec["max_savings_vs_worst"] > 0:
-        st.info(f"최적 코드로 신고하면 최대 **{rec['max_savings_vs_worst']:,}원** 절세 효과가 있습니다.")
+    st.warning("이 표는 신고 코드 추천이나 절세 자문이 아닙니다. 지급명세서와 실제 용역 내용을 확인하세요.")
 
     st.divider()
-    st.subheader("SHAP 근거 — 왜 이 예측이 나왔는가")
+    st.subheader("모델이 참고한 주요 입력 요인")
+    st.caption("모델 내부 계산에 대한 설명이며, 실제 소득 변화의 원인이나 예측 정확도를 증명하지 않습니다.")
 
     factors = explanation["top_factors"]
     fig2 = go.Figure(go.Bar(
@@ -557,7 +562,13 @@ else:
         st.info("이력이 6개월 미만이라 안정성 자가진단을 건너뜁니다.")
 
     st.divider()
-    st.subheader("LLM 요약")
+    st.subheader("요약")
+    st.caption("기본값은 로컬 템플릿입니다. 외부 LLM 사용에 동의하면 아래 재무 추정 정보가 API 제공업체로 전송될 수 있습니다.")
+    use_external_llm = st.checkbox(
+        "외부 LLM 전송에 동의하고 AI 요약 사용",
+        value=False,
+        help="worker ID는 보내지 않지만 소득·세액·안정성 추정치가 전송됩니다.",
+    )
 
     ctx = build_insight_context(
         worker_name=f"worker #{worker_id}",
@@ -569,9 +580,14 @@ else:
         recommendation=rec,
         stability=stab,
     )
-    report_text, source = generate_llm_report(ctx)
+    report_text, source = generate_llm_report(ctx, prefer_api=use_external_llm)
     st.markdown(f"> {report_text}")
-    st.caption(f"생성 방식: `{source}`" + ("" if source == "claude-api" else " (ANTHROPIC_API_KEY 미설정 — 템플릿 폴백)"))
+    if source == "claude-api":
+        st.caption("생성 방식: `claude-api` (사용자 동의 후 전송)")
+    elif use_external_llm:
+        st.caption("생성 방식: `template` (API를 사용할 수 없어 로컬 템플릿으로 대체)")
+    else:
+        st.caption("생성 방식: `template` (외부 전송 없음)")
 
     st.divider()
     st.subheader("모델 비교 — 왜 LightGBM인가")
