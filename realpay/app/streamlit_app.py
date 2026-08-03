@@ -517,7 +517,6 @@ else:
             "구분": "플랫폼 대표 후보" if r.industry_code == rec["representative"].industry_code else "추가 확인 후보",
         })
     st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-    st.warning("이 표는 신고 코드 추천이나 절세 자문이 아닙니다. 지급명세서와 실제 용역 내용을 확인하세요.")
 
     st.divider()
     st.subheader("모델이 참고한 주요 입력 요인")
@@ -563,12 +562,6 @@ else:
 
     st.divider()
     st.subheader("요약")
-    st.caption("기본값은 로컬 템플릿입니다. 외부 LLM 사용에 동의하면 아래 재무 추정 정보가 API 제공업체로 전송될 수 있습니다.")
-    use_external_llm = st.checkbox(
-        "외부 LLM 전송에 동의하고 AI 요약 사용",
-        value=False,
-        help="worker ID는 보내지 않지만 소득·세액·안정성 추정치가 전송됩니다.",
-    )
 
     ctx = build_insight_context(
         worker_name=f"worker #{worker_id}",
@@ -580,14 +573,9 @@ else:
         recommendation=rec,
         stability=stab,
     )
-    report_text, source = generate_llm_report(ctx, prefer_api=use_external_llm)
+    report_text, source = generate_llm_report(ctx)
     st.markdown(f"> {report_text}")
-    if source == "claude-api":
-        st.caption("생성 방식: `claude-api` (사용자 동의 후 전송)")
-    elif use_external_llm:
-        st.caption("생성 방식: `template` (API를 사용할 수 없어 로컬 템플릿으로 대체)")
-    else:
-        st.caption("생성 방식: `template` (외부 전송 없음)")
+    st.caption(f"생성 방식: `{source}` (외부 전송 없음)")
 
     st.divider()
     st.subheader("모델 비교 — 왜 LightGBM인가")

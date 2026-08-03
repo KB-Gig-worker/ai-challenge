@@ -9,16 +9,16 @@
   "improvement_vs_baseline_pct": 8.3,
   "cv_folds": 5,
   "cv_mae_per_fold": [
-    495378.0,
-    537478.0,
-    597294.0,
-    699670.0,
-    626443.0
+    565823.0,
+    606587.0,
+    584426.0,
+    621768.0,
+    574364.0
   ],
-  "cv_mae_mean": 591253.0,
-  "cv_mae_std": 70870.0,
-  "cv_mape_mean": 0.3883,
-  "cv_mape_std": 0.0415,
+  "cv_mae_mean": 590593.0,
+  "cv_mae_std": 20701.0,
+  "cv_mape_mean": 0.3901,
+  "cv_mape_std": 0.0521,
   "feature_columns": [
     "lag1_income",
     "lag2_income",
